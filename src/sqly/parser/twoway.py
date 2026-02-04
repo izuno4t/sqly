@@ -191,13 +191,18 @@ class TwoWaySQLParser:
                             col_expr, col_start = extracted
                             if is_named:
                                 replacement, expanded = self._expand_in_clause_split_named(
-                                    token.name, value, in_limit, col_expr,
+                                    token.name,
+                                    value,
+                                    in_limit,
+                                    col_expr,
                                 )
                                 line = line[:col_start] + replacement + line[token.end :]
                                 named_bind_params.update(expanded)
                             else:
                                 replacement, expanded = self._expand_in_clause_split(
-                                    value, in_limit, col_expr,
+                                    value,
+                                    in_limit,
+                                    col_expr,
                                 )
                                 line = line[:col_start] + replacement + line[token.end :]
                                 for v in reversed(expanded):
@@ -267,7 +272,10 @@ class TwoWaySQLParser:
         return f"IN ({placeholders})", named
 
     def _expand_in_clause_split(
-        self, values: list[Any], limit: int, col_expr: str,
+        self,
+        values: list[Any],
+        limit: int,
+        col_expr: str,
     ) -> tuple[str, list[Any]]:
         """IN句のリストを上限で分割してOR結合する.
 
@@ -288,7 +296,11 @@ class TwoWaySQLParser:
         return "(" + " OR ".join(parts) + ")", list(values)
 
     def _expand_in_clause_split_named(
-        self, name: str, values: list[Any], limit: int, col_expr: str,
+        self,
+        name: str,
+        values: list[Any],
+        limit: int,
+        col_expr: str,
     ) -> tuple[str, dict[str, Any]]:
         """IN句のリストを上限で分割して名前付きプレースホルダでOR結合する.
 
@@ -372,7 +384,9 @@ class TwoWaySQLParser:
                 "in_clause_column_unresolved": "IN句分割の列式を抽出できません",
             },
             "en": {
-                "in_clause_column_unresolved": "Failed to extract column expression for IN clause split",
+                "in_clause_column_unresolved": (
+                    "Failed to extract column expression for IN clause split"
+                ),
             },
         }
         lang = config.ERROR_MESSAGE_LANGUAGE
