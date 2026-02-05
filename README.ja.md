@@ -58,26 +58,30 @@ WHERE
     AND status = /* $status */'active'
 ```
 
-### 3. 実行
+### 3. パースと実行
 
 ```python
-from sqlym import SqlExecutor, create_mapper
+from sqlym import SqlLoader, parse_sql, create_mapper
 
-executor = SqlExecutor(connection)
+# SQL テンプレート読み込み
+loader = SqlLoader("sql")
+sql_template = loader.load("employee/find_by_dept.sql")
+
+# パラメータでパース（None の行は自動削除）
+result = parse_sql(sql_template, {
+    "id": 100,
+    "dept_id": None,  # この行は削除される
+    "status": "active",
+})
+
+# データベースドライバーで実行
+cursor.execute(result.sql, result.params)
+
+# 結果をエンティティにマッピング
 mapper = create_mapper(Employee)
+employees = [mapper.map(row) for row in cursor.fetchall()]
 
-# パラメータがNoneの行は自動削除される
-result = executor.query(
-    "sql/employee/find_by_dept.sql",
-    {
-        "id": 100,
-        "dept_id": None,
-        "status": "active",
-    },  # dept_idの行は消える
-    mapper=mapper
-)
-
-for emp in result:
+for emp in employees:
     print(emp.name)
 ```
 
@@ -127,7 +131,8 @@ SQL 断片を表示したくない場合は
 設定で無効化してください。
 
 ```python
-from sqlym import config
+from sqlym.config import ERROR_INCLUDE_SQL, ERROR_MESSAGE_LANGUAGE
+import sqlym.config as config
 
 config.ERROR_INCLUDE_SQL = False
 config.ERROR_MESSAGE_LANGUAGE = "en"

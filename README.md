@@ -58,26 +58,30 @@ WHERE
     AND status = /* $status */'active'
 ```
 
-### 3. Execute
+### 3. Parse and Execute
 
 ```python
-from sqlym import SqlExecutor, create_mapper
+from sqlym import SqlLoader, parse_sql, create_mapper
 
-executor = SqlExecutor(connection)
+# Load SQL template
+loader = SqlLoader("sql")
+sql_template = loader.load("employee/find_by_dept.sql")
+
+# Parse with parameters (lines with None are automatically removed)
+result = parse_sql(sql_template, {
+    "id": 100,
+    "dept_id": None,  # this line is removed
+    "status": "active",
+})
+
+# Execute with your database driver
+cursor.execute(result.sql, result.params)
+
+# Map results to entity
 mapper = create_mapper(Employee)
+employees = [mapper.map(row) for row in cursor.fetchall()]
 
-# Lines with None parameters are automatically removed
-result = executor.query(
-    "sql/employee/find_by_dept.sql",
-    {
-        "id": 100,
-        "dept_id": None,
-        "status": "active",
-    },  # dept_id line is removed
-    mapper=mapper
-)
-
-for emp in result:
+for emp in employees:
     print(emp.name)
 ```
 
@@ -127,7 +131,8 @@ If you want to hide the SQL snippet from error messages, disable it via
 config:
 
 ```python
-from sqlym import config
+from sqlym.config import ERROR_INCLUDE_SQL, ERROR_MESSAGE_LANGUAGE
+import sqlym.config as config
 
 config.ERROR_INCLUDE_SQL = False
 config.ERROR_MESSAGE_LANGUAGE = "en"
