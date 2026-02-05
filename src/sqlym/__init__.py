@@ -8,6 +8,7 @@ from sqlym.loader import SqlLoader
 from sqlym.mapper import ManualMapper, RowMapper, create_mapper
 from sqlym.mapper.column import Column, entity
 from sqlym.parser.twoway import ParsedSQL, TwoWaySQLParser
+from sqlym.sqlym import Sqlym
 
 __all__ = [
     "Column",
@@ -20,6 +21,7 @@ __all__ = [
     "SqlLoader",
     "SqlParseError",
     "SqlyError",
+    "Sqlym",
     "TwoWaySQLParser",
     "create_mapper",
     "entity",

@@ -23,13 +23,13 @@
 
 | ID | Status | Summary | DependsOn |
 |----|--------|---------|-----------|
-| TASK-001 | ⏳ | Sqlym クラスの基本実装（__init__、query、query_one、execute） | - |
-| TASK-002 | ⏳ | commit/rollback メソッドの実装（connection への委譲） | TASK-001 |
-| TASK-003 | ⏳ | コンテキストマネージャの実装（__enter__/__exit__ の委譲） | TASK-002 |
-| TASK-004 | ⏳ | auto_commit 機能の実装 | TASK-001 |
-| TASK-005 | ⏳ | Dialect 自動検出機能の実装 | TASK-001 |
-| TASK-006 | ⏳ | Sqlym クラスのユニットテスト作成 | TASK-003,TASK-004,TASK-005 |
-| TASK-007 | ⏳ | Sqlym クラスの統合テスト作成（SQLite） | TASK-006 |
+| TASK-001 | ✅ | Sqlym クラスの基本実装（__init__、query、query_one、execute） | - |
+| TASK-002 | ✅ | commit/rollback メソッドの実装（connection への委譲） | TASK-001 |
+| TASK-003 | ✅ | コンテキストマネージャの実装（__enter__/__exit__ の委譲） | TASK-002 |
+| TASK-004 | ✅ | auto_commit 機能の実装 | TASK-001 |
+| TASK-005 | ✅ | Dialect 自動検出機能の実装 | TASK-001 |
+| TASK-006 | ✅ | Sqlym クラスのユニットテスト作成 | TASK-003,TASK-004,TASK-005 |
+| TASK-007 | ✅ | Sqlym クラスの統合テスト作成（SQLite） | TASK-006 |
 | TASK-008 | ⏳ | negative/positive 判定の拡張（False、空リスト対応） | - |
 | TASK-009 | ⏳ | negative/positive 拡張のテスト作成 | TASK-008 |
 | TASK-010 | ⏳ | 行末区切り（AND/OR/カンマ）の自動除去機能を実装 | - |

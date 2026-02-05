@@ -23,7 +23,6 @@ from typing import Annotated
 
 from sqlym import Column, Dialect, SqlLoader, create_mapper, escape_like, parse_sql
 
-
 # =============================================================================
 # Entity Definition
 # =============================================================================
