@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqly import Dialect
+from sqly import Dialect, escape_like
 
 
 class TestDialect:
@@ -100,3 +100,70 @@ class TestBackslashIsEscape:
     def test_oracle_false(self) -> None:
         """Oracle はバックスラッシュがエスケープ文字ではない."""
         assert Dialect.ORACLE.backslash_is_escape is False
+
+
+class TestLikeEscapeChar:
+    """like_escape_char プロパティのテスト."""
+
+    def test_default_escape_char(self) -> None:
+        """全 Dialect でデフォルトエスケープ文字は '#'."""
+        for dialect in Dialect:
+            assert dialect.like_escape_char == "#"
+
+
+class TestEscapeLike:
+    """escape_like 関数のテスト."""
+
+    def test_escape_percent(self) -> None:
+        """% をエスケープする."""
+        assert escape_like("10%off", Dialect.SQLITE) == "10#%off"
+
+    def test_escape_underscore(self) -> None:
+        """_ をエスケープする."""
+        assert escape_like("file_name", Dialect.SQLITE) == "file#_name"
+
+    def test_escape_hash(self) -> None:
+        """# (エスケープ文字自体) をエスケープする."""
+        assert escape_like("C#", Dialect.SQLITE) == "C##"
+
+    def test_escape_multiple(self) -> None:
+        """複数の特殊文字をエスケープする."""
+        assert escape_like("10%_#", Dialect.SQLITE) == "10#%#_##"
+
+    def test_no_escape_needed(self) -> None:
+        """エスケープ不要な文字列はそのまま."""
+        assert escape_like("hello", Dialect.SQLITE) == "hello"
+
+    def test_empty_string(self) -> None:
+        """空文字列はそのまま."""
+        assert escape_like("", Dialect.SQLITE) == ""
+
+    def test_oracle_fullwidth_percent(self) -> None:
+        """Oracle は全角 ％ もエスケープする."""
+        assert escape_like("100％達成", Dialect.ORACLE) == "100#％達成"
+
+    def test_oracle_fullwidth_underscore(self) -> None:
+        """Oracle は全角 ＿ もエスケープする."""
+        assert escape_like("名前＿太郎", Dialect.ORACLE) == "名前#＿太郎"
+
+    def test_non_oracle_no_fullwidth_escape(self) -> None:
+        """Oracle 以外は全角文字をエスケープしない."""
+        assert escape_like("100％達成", Dialect.SQLITE) == "100％達成"
+        assert escape_like("100％達成", Dialect.POSTGRESQL) == "100％達成"
+        assert escape_like("100％達成", Dialect.MYSQL) == "100％達成"
+
+    def test_custom_escape_char(self) -> None:
+        """カスタムエスケープ文字を指定できる."""
+        assert escape_like("10%off", Dialect.SQLITE, escape_char="\\") == "10\\%off"
+
+    def test_custom_escape_char_itself(self) -> None:
+        """カスタムエスケープ文字自体もエスケープ対象."""
+        # # はデフォルトでエスケープ対象、\ でエスケープ
+        assert escape_like("C#", Dialect.SQLITE, escape_char="\\") == "C\\#"
+
+    def test_all_dialects_basic(self) -> None:
+        """全 Dialect で基本動作を確認."""
+        for dialect in Dialect:
+            result = escape_like("test%value_name", dialect)
+            assert "#%" in result
+            assert "#_" in result

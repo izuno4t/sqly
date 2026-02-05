@@ -56,7 +56,7 @@
 | TASK-031 | ✅ | GitHub Actions CIワークフローを作成する | TASK-022, TASK-028 |
 | TASK-032 | ✅ | DialectクラスにDB固有プロパティを追加する（LIKEエスケープ、IN句上限、バックスラッシュエスケープ） | TASK-019 |
 | TASK-033 | ✅ | IN句展開時のDB固有上限分割を実装しテストする（Oracle 1000件制限対応） | TASK-032, TASK-008 |
-| TASK-034 | ⏳ | LIKEパラメータのエスケープ処理を実装しテストする | TASK-032 |
+| TASK-034 | ✅ | LIKEパラメータのエスケープ処理を実装しテストする | TASK-032 |
 | TASK-035 | ⏳ | SqlLoaderにRDBMS別SQLファイルロードを追加しテストする | TASK-032, TASK-016 |
 | TASK-036 | ⏳ | Dialect拡張機能の統合テストを作成する（全RDBMS） | TASK-033, TASK-034, TASK-035 |
 
@@ -190,10 +190,12 @@
 ### TASK-034
 
 - 補足: LIKE用パラメータのエスケープ処理を実装する
-  - パラメータ構文に LIKE 用指定を追加するか、ユーティリティ関数として提供するか設計判断が必要
-  - Clione-SQL では `$name` パラメータに対し LIKE 系演算子があれば自動エスケープ
+  - ユーティリティ関数 `escape_like(value, dialect)` として実装（`src/sqly/escape_utils.py`）
   - エスケープ対象文字は `Dialect.like_escape_chars` から取得
+  - `Dialect.like_escape_char` プロパティを追加（デフォルト: `#`）
+  - 自動検出機能は BACKLOG-009 として将来対応
 - 参考: Clione-SQL の `Dialect.needLikeEscape()` メソッド
+- 実装済み: `escape_like()` 関数、テスト（`tests/test_dialect.py`）
 
 ### TASK-035
 
@@ -221,6 +223,7 @@
 | BACKLOG-006 | 一意制約違反の DB 別検出 | PostgreSQL: SQLState `23505`、MySQL: エラーコード `1062`、SQLite: メッセージ判定 |
 | BACKLOG-007 | スクリプトブロック区切り文字の DB 別対応 | Standard: `/`、MSSQL: `GO`、DB2: `@` |
 | BACKLOG-008 | DB バージョン別 Dialect 対応 | Oracle 11g vs 12c+、MySQL 5 vs 8、MSSQL 2008 vs 2012+ 等 |
+| BACKLOG-009 | LIKE 演算子自動検出による自動エスケープ | パーサーが LIKE 演算子を検出して自動的に `escape_like()` を適用 |
 
 ### 各 Backlog 詳細
 
@@ -285,3 +288,12 @@
   - MySQL 5: FOR UPDATE NOWAIT 非対応
   - MySQL 8: FOR UPDATE NOWAIT 対応
 - 参考: Doma2 `Oracle11Dialect` → `OracleDialect`、`MysqlDialect.MySqlVersion`
+
+#### BACKLOG-009: LIKE 演算子自動検出による自動エスケープ
+
+- パーサーが LIKE 演算子を検出して、パラメータ値に対して自動的に `escape_like()` を適用する
+  - `WHERE name LIKE /* $name */'%太郎%'` のようなパターンを検出
+  - 検出時にパラメータ値を自動エスケープし、ESCAPE 句を自動付与
+- 参考: Clione-SQL の `Dialect.needLikeEscape()` メソッド
+- 現在は `escape_like()` ユーティリティ関数として手動エスケープが可能（TASK-034 で実装済み）
+- 注意: 自動検出は複雑なため、ユーザーが明示的に `escape_like()` を使う方式を推奨する可能性もあり

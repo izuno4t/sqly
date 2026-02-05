@@ -68,3 +68,12 @@ class Dialect(Enum):
                 return True
             case _:
                 return False
+
+    @property
+    def like_escape_char(self) -> str:
+        """LIKE エスケープに使用するエスケープ文字を返す.
+
+        Returns:
+            エスケープ文字（デフォルト: ``#``）
+        """
+        return "#"

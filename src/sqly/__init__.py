@@ -2,6 +2,7 @@
 
 from sqly._parse import parse_sql
 from sqly.dialect import Dialect
+from sqly.escape_utils import escape_like
 from sqly.exceptions import MappingError, SqlFileNotFoundError, SqlParseError, SqlyError
 from sqly.loader import SqlLoader
 from sqly.mapper import ManualMapper, RowMapper, create_mapper
@@ -22,5 +23,6 @@ __all__ = [
     "TwoWaySQLParser",
     "create_mapper",
     "entity",
+    "escape_like",
     "parse_sql",
 ]
