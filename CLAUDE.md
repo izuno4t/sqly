@@ -9,25 +9,30 @@ sqly is a SQL-first database access library for Python, inspired by Java's Clion
 - **Language**: Python 3.10+
 - **Dependencies**: None (stdlib only); Pydantic is optional
 - **License**: MIT
-- **Status**: Design/specification phase — no implementation code yet
+- **Status**: v1.0 implementation complete
 
 ## Architecture
 
 ```
 src/sqly/
 ├── __init__.py          # Public API (parse_sql, create_mapper, Column, entity, etc.)
+├── _parse.py            # parse_sql convenience function
+├── config.py            # Error message settings
+├── dialect.py           # Dialect enum (SQLITE, POSTGRESQL, MYSQL, ORACLE)
+├── escape_utils.py      # escape_like utility for LIKE clause escaping
+├── exceptions.py        # SqlyError, SqlParseError, MappingError, SqlFileNotFoundError
+├── loader.py            # SqlLoader: file-based SQL template loading (with dialect support)
 ├── parser/
 │   ├── tokenizer.py     # SQL tokenizer
 │   ├── line_unit.py     # LineUnit: line-level processing unit
 │   └── twoway.py        # TwoWaySQLParser: Clione-SQL 2way SQL engine
-├── mapper/
-│   ├── protocol.py      # RowMapper Protocol (runtime_checkable)
-│   ├── dataclass.py     # DataclassMapper (auto-mapping with caching)
-│   ├── pydantic.py      # PydanticMapper (optional)
-│   └── column.py        # Column annotation & @entity decorator
-├── executor.py          # SQL execution
-├── loader.py            # SqlLoader: file-based SQL template loading
-└── exceptions.py        # SqlyError, SqlParseError, MappingError, SqlFileNotFoundError
+└── mapper/
+    ├── protocol.py      # RowMapper Protocol (runtime_checkable)
+    ├── dataclass.py     # DataclassMapper (auto-mapping with caching)
+    ├── pydantic.py      # PydanticMapper (optional)
+    ├── column.py        # Column annotation & @entity decorator
+    ├── manual.py        # ManualMapper
+    └── factory.py       # create_mapper factory function
 ```
 
 ### Core Concepts

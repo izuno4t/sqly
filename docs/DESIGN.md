@@ -5,20 +5,25 @@
 ```
 sqly/
 ├── __init__.py          # 公開API
+├── _parse.py            # parse_sql便利関数
+├── config.py            # エラーメッセージ設定
+├── dialect.py           # Dialect enum（RDBMS方言）
+├── escape_utils.py      # LIKEエスケープ等ユーティリティ
+├── exceptions.py        # 例外クラス
+├── loader.py            # SQLファイル読み込み
 ├── parser/
 │   ├── __init__.py
 │   ├── tokenizer.py     # SQLトークナイザー
 │   ├── line_unit.py     # 行単位処理
 │   └── twoway.py        # 2way SQLパーサー本体
-├── mapper/
-│   ├── __init__.py
-│   ├── protocol.py      # RowMapperプロトコル
-│   ├── dataclass.py     # dataclass用マッパー
-│   ├── pydantic.py      # Pydantic用マッパー
-│   └── column.py        # カラムマッピング
-├── executor.py          # SQL実行
-├── loader.py            # SQLファイル読み込み
-└── exceptions.py        # 例外クラス
+└── mapper/
+    ├── __init__.py
+    ├── protocol.py      # RowMapperプロトコル
+    ├── dataclass.py     # dataclass用マッパー
+    ├── pydantic.py      # Pydantic用マッパー
+    ├── column.py        # カラムマッピング
+    ├── manual.py        # ManualMapper
+    └── factory.py       # create_mapperファクトリ
 ```
 
 ---
@@ -706,17 +711,17 @@ Clione-SQL の `LoaderUtil.getNodeByPath()` と同等のフォールバック機
 ```python
 loader = SqlLoader("sql")
 
-# dialect 指定あり: まず "find.sql-oracle" を探し、なければ "find.sql" にフォールバック
+# dialect 指定あり: まず "find.oracle.sql" を探し、なければ "find.sql" にフォールバック
 sql = loader.load("employee/find.sql", dialect=Dialect.ORACLE)
 ```
 
 ファイル解決順序：
 
-1. `{base_path}/{path}-{dialect_id}` （例: `sql/employee/find.sql-oracle`）
+1. `{base_path}/{dir}/{name}.{dialect_id}.{ext}` （例: `sql/employee/find.oracle.sql`）
 2. `{base_path}/{path}` （例: `sql/employee/find.sql`）
 
 これにより、大部分の SQL は共通ファイルで記述し、
-RDBMS 固有の構文が必要な場合のみ `-{dialect}` サフィックス付きファイルで上書きできる。
+RDBMS 固有の構文が必要な場合のみ `.{dialect}` サフィックス付きファイルで上書きできる。
 
 ---
 

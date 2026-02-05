@@ -388,22 +388,22 @@ class TestDialectSqlLoaderIntegration:
         sql_dir = tmp_path / "sql"
         sql_dir.mkdir()
         # 汎用ファイル
-        (sql_dir / "count.sql").write_text(
-            "SELECT COUNT(*) as cnt FROM employees",
+        (sql_dir / "list.sql").write_text(
+            "SELECT * FROM employees ORDER BY id",
             encoding="utf-8",
         )
         # MySQL 固有ファイル（LIMIT使用）
-        (sql_dir / "count.mysql.sql").write_text(
-            "SELECT COUNT(*) as cnt FROM employees LIMIT 3",
+        (sql_dir / "list.mysql.sql").write_text(
+            "SELECT * FROM employees ORDER BY id LIMIT 3",
             encoding="utf-8",
         )
 
         loader = SqlLoader(sql_dir)
-        sql_template = loader.load("count.sql", dialect=Dialect.MYSQL)
+        sql_template = loader.load("list.sql", dialect=Dialect.MYSQL)
         result = parse_sql(sql_template, {}, dialect=Dialect.MYSQL)
         rows = _fetch_all(db, result)
         # MySQL 固有ファイルが使われ、LIMIT 3 で3件
-        assert rows[0]["cnt"] == 3
+        assert len(rows) == 3
 
     def test_dialect_fallback_to_generic(self, db: Any, tmp_path: Path) -> None:
         """Dialect 固有ファイルがなければ汎用ファイルにフォールバック."""
