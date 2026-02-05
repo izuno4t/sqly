@@ -420,3 +420,98 @@ class TestDialectSqlLoaderIntegration:
         result = parse_sql(sql_template, {}, dialect=Dialect.MYSQL)  # 実行はMySQL
         rows = _fetch_all(db, result)
         assert rows[0]["cnt"] == 4
+
+
+# =============================================================================
+# M2 Feature Integration Tests
+# =============================================================================
+
+
+class TestModifiersIntegration:
+    """Modifier integration tests."""
+
+    def test_bindless_modifier_keeps_line_without_binding(self, db: Any) -> None:
+        """& modifier keeps line without creating placeholder."""
+        sql = "SELECT * FROM employees WHERE dept_id IS NOT NULL /* &has_dept */"
+        result = parse_sql(sql, {"has_dept": True}, dialect=Dialect.MYSQL)
+        rows = _fetch_all(db, result)
+        assert len(rows) == 3
+
+    def test_fallback_modifier(self, db: Any) -> None:
+        """? modifier uses first positive value."""
+        sql = "SELECT * FROM employees WHERE dept_id = /* ?primary ?secondary */0"
+        result = parse_sql(sql, {"primary": None, "secondary": 10}, dialect=Dialect.MYSQL)
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+        assert all(r["dept_id"] == 10 for r in rows)
+
+    def test_required_modifier_raises_on_none(self, db: Any) -> None:
+        """@ modifier raises error on None."""
+        from sqlym.exceptions import SqlParseError
+
+        sql = "SELECT * FROM employees WHERE id = /* @id */1"
+        with pytest.raises(SqlParseError):
+            parse_sql(sql, {"id": None}, dialect=Dialect.MYSQL)
+
+
+class TestOperatorConversionIntegration:
+    """Operator auto-conversion integration tests."""
+
+    def test_equals_with_list_becomes_in(self, db: Any) -> None:
+        """= with list becomes IN."""
+        sql = "SELECT * FROM employees WHERE id /* ids */= 1"
+        result = parse_sql(sql, {"ids": [1, 2]}, dialect=Dialect.MYSQL)
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+        assert {r["id"] for r in rows} == {1, 2}
+
+    def test_equals_with_none_becomes_is_null(self, db: Any) -> None:
+        """= with None becomes IS NULL."""
+        sql = "SELECT * FROM employees WHERE dept_id /* dept */= 0"
+        result = parse_sql(sql, {"dept": None}, dialect=Dialect.MYSQL)
+        rows = _fetch_all(db, result)
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Diana"
+
+
+class TestHelperFunctionsIntegration:
+    """%concat helper function integration tests."""
+
+    def test_concat_helper(self, db: Any) -> None:
+        """%concat concatenates values."""
+        sql = "SELECT * FROM employees WHERE name LIKE /* %concat('%', keyword, '%') */'%test%'"
+        result = parse_sql(sql, {"keyword": "lic"}, dialect=Dialect.MYSQL)
+        rows = _fetch_all(db, result)
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Alice"
+
+
+class TestBlockDirectivesIntegration:
+    """%IF/%ELSE block directive integration tests."""
+
+    def test_if_block_true(self, db: Any) -> None:
+        """%IF with true condition includes block."""
+        sql = """\
+SELECT * FROM employees
+WHERE 1=1
+-- %IF filter_dept
+    AND dept_id = /* dept_id */0
+-- %END"""
+        result = parse_sql(sql, {"filter_dept": True, "dept_id": 10}, dialect=Dialect.MYSQL)
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+
+
+class TestUnionIntegration:
+    """UNION operation integration tests."""
+
+    def test_union_second_removed(self, db: Any) -> None:
+        """UNION with second query removed."""
+        sql = """\
+SELECT * FROM employees WHERE dept_id = /* $dept1 */0
+UNION
+SELECT * FROM employees WHERE dept_id = /* $dept2 */0"""
+        result = parse_sql(sql, {"dept1": 10, "dept2": None}, dialect=Dialect.MYSQL)
+        assert "UNION" not in result.sql
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2

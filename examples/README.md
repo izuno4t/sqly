@@ -37,11 +37,16 @@ Clean Architecture implementation example.
 
 ```
 clean_architecture/
-├── domain/models/              # Domain models
-├── domain/repositories/        # Repository interfaces
-├── application/use_cases/      # Use cases
-├── infrastructure/dao/         # DAO (sqlym) + Entity
-├── infrastructure/repositories/ # Repository (Entity→Model)
+├── main.py                      # Composition Root
+├── domain/
+│   ├── models/                  # Domain models
+│   └── repositories/            # Repository interfaces
+├── application/
+│   └── use_cases/               # Use cases
+├── infrastructure/
+│   ├── dao/
+│   │   └── entities/            # Persistence entities
+│   └── repositories/            # Repository (Entity→Model)
 └── sql/
 ```
 

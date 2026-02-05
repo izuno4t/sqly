@@ -436,3 +436,292 @@ class TestDialectSqlLoaderIntegration:
         result = parse_sql(sql_template, {}, dialect=Dialect.SQLITE)  # 実行はSQLite
         rows = _fetch_all(db, result)
         assert rows[0]["cnt"] == 4
+
+
+# =============================================================================
+# M2 Feature Integration Tests
+# =============================================================================
+
+
+class TestModifiersIntegration:
+    """Modifier integration tests."""
+
+    def test_bindless_modifier_keeps_line_without_binding(self, db: sqlite3.Connection) -> None:
+        """& modifier keeps line without creating placeholder."""
+        sql = "SELECT * FROM employees WHERE dept_id IS NOT NULL /* &has_dept */"
+        result = parse_sql(sql, {"has_dept": True})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 3  # 3 employees have dept_id
+
+    def test_bindless_modifier_removes_line(self, db: sqlite3.Connection) -> None:
+        """& modifier with None removes line."""
+        sql = """\
+SELECT * FROM employees
+WHERE
+    name = /* name */'default'
+    AND dept_id IS NOT NULL /* &has_dept */"""
+        result = parse_sql(sql, {"name": "Alice", "has_dept": None})
+        assert "dept_id" not in result.sql
+        rows = _fetch_all(db, result)
+        assert len(rows) == 1
+
+    def test_negation_modifier(self, db: sqlite3.Connection) -> None:
+        """$! modifier inverts removal logic."""
+        sql = """\
+SELECT * FROM employees
+WHERE
+    name = /* name */'default'
+    AND dept_id = /* $!skip_dept */10"""
+        # skip_dept=10 (positive) -> line removed
+        result = parse_sql(sql, {"name": "Alice", "skip_dept": 10})
+        assert "dept_id" not in result.sql
+
+    def test_fallback_modifier(self, db: sqlite3.Connection) -> None:
+        """? modifier uses first positive value."""
+        sql = "SELECT * FROM employees WHERE dept_id = /* ?primary ?secondary */0"
+        result = parse_sql(sql, {"primary": None, "secondary": 10})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+        assert all(r["dept_id"] == 10 for r in rows)
+
+    def test_required_modifier_raises_on_none(self, db: sqlite3.Connection) -> None:
+        """@ modifier raises error on None."""
+        from sqlym.exceptions import SqlParseError
+
+        sql = "SELECT * FROM employees WHERE id = /* @id */1"
+        with pytest.raises(SqlParseError):
+            parse_sql(sql, {"id": None})
+
+
+class TestOperatorConversionIntegration:
+    """Operator auto-conversion integration tests."""
+
+    def test_equals_with_list_becomes_in(self, db: sqlite3.Connection) -> None:
+        """= with list becomes IN."""
+        sql = "SELECT * FROM employees WHERE id /* ids */= 1"
+        result = parse_sql(sql, {"ids": [1, 2]})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+        assert {r["id"] for r in rows} == {1, 2}
+
+    def test_equals_with_none_becomes_is_null(self, db: sqlite3.Connection) -> None:
+        """= with None becomes IS NULL."""
+        sql = "SELECT * FROM employees WHERE dept_id /* dept */= 0"
+        result = parse_sql(sql, {"dept": None})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Diana"
+
+    def test_not_equals_with_none_becomes_is_not_null(self, db: sqlite3.Connection) -> None:
+        """<> with None becomes IS NOT NULL."""
+        sql = "SELECT * FROM employees WHERE dept_id /* dept */<> 0"
+        result = parse_sql(sql, {"dept": None})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 3
+
+
+class TestLikeListExpansionIntegration:
+    """LIKE list expansion integration tests."""
+
+    def test_like_with_list_or_expansion(self, db: sqlite3.Connection) -> None:
+        """LIKE with list expands to OR."""
+        sql = "SELECT * FROM employees WHERE name /* patterns */LIKE 'pattern'"
+        result = parse_sql(sql, {"patterns": ["A%", "B%"]})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+        names = {r["name"] for r in rows}
+        assert names == {"Alice", "Bob"}
+
+    def test_like_with_empty_list(self, db: sqlite3.Connection) -> None:
+        """LIKE with empty list returns no results."""
+        sql = "SELECT * FROM employees WHERE name /* patterns */LIKE 'pattern'"
+        result = parse_sql(sql, {"patterns": []})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 0
+
+
+class TestHelperFunctionsIntegration:
+    """%concat, %L, %STR helper function integration tests."""
+
+    def test_concat_helper(self, db: sqlite3.Connection) -> None:
+        """%concat concatenates values."""
+        sql = "SELECT * FROM employees WHERE name LIKE /* %concat('%', keyword, '%') */'%test%'"
+        result = parse_sql(sql, {"keyword": "lic"})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Alice"
+
+    def test_like_escape_helper(self, db: sqlite3.Connection) -> None:
+        """%L escapes LIKE special characters."""
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+        conn.execute("INSERT INTO items (name) VALUES ('100% done')")
+        conn.execute("INSERT INTO items (name) VALUES ('50 percent')")
+        conn.commit()
+
+        sql = "SELECT * FROM items WHERE name LIKE /*%L '%' keyword '%' */'%test%'"
+        result = parse_sql(sql, {"keyword": "%"})
+        cursor = conn.execute(result.sql, result.params)
+        rows = [dict(row) for row in cursor.fetchall()]
+        assert len(rows) == 1
+        assert rows[0]["name"] == "100% done"
+
+    def test_str_helper_embeds_directly(self, db: sqlite3.Connection) -> None:
+        """%STR embeds value directly into SQL."""
+        sql = "SELECT * FROM employees ORDER BY /* %STR(order_col) */id"
+        result = parse_sql(sql, {"order_col": "name"})
+        rows = _fetch_all(db, result)
+        assert rows[0]["name"] == "Alice"  # Alphabetically first
+
+
+class TestBlockDirectivesIntegration:
+    """%IF/%ELSE block directive integration tests."""
+
+    def test_if_block_true(self, db: sqlite3.Connection) -> None:
+        """%IF with true condition includes block."""
+        sql = """\
+SELECT * FROM employees
+WHERE 1=1
+-- %IF filter_dept
+    AND dept_id = /* dept_id */0
+-- %END"""
+        result = parse_sql(sql, {"filter_dept": True, "dept_id": 10})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+
+    def test_if_else_block(self, db: sqlite3.Connection) -> None:
+        """%IF/%ELSE selects appropriate block."""
+        sql = """\
+SELECT * FROM employees
+WHERE 1=1
+-- %IF use_name
+    AND name = /* name */'default'
+-- %ELSE
+    AND dept_id IS NOT NULL
+-- %END"""
+        result = parse_sql(sql, {"use_name": False, "name": "Alice"})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 3  # 3 employees have dept_id
+
+
+class TestInlineConditionsIntegration:
+    """Inline condition integration tests."""
+
+    def test_inline_if_true(self, db: sqlite3.Connection) -> None:
+        """Inline %if with true condition."""
+        sql = (
+            "SELECT * FROM employees "
+            "WHERE dept_id = /*%if use_val */ /* val */0 /*%else */ 10 /*%end*/"
+        )
+        result = parse_sql(sql, {"use_val": True, "val": 20})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Bob"
+
+    def test_inline_if_false(self, db: sqlite3.Connection) -> None:
+        """Inline %if with false condition uses else."""
+        sql = (
+            "SELECT * FROM employees "
+            "WHERE dept_id = /*%if use_val */ /* val */0 /*%else */ 10 /*%end*/"
+        )
+        result = parse_sql(sql, {"use_val": False, "val": 20})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+
+
+class TestIncludeDirectiveIntegration:
+    """%include directive integration tests."""
+
+    def test_include_expands_fragment(self, tmp_path: Path) -> None:
+        """%include loads external SQL fragment."""
+        from sqlym.parser.twoway import TwoWaySQLParser
+
+        sql_dir = tmp_path / "sql"
+        sql_dir.mkdir()
+        (sql_dir / "condition.sql").write_text("dept_id = /* dept_id */0")
+
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.execute("CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT, dept_id INTEGER)")
+        conn.execute("INSERT INTO employees VALUES (1, 'Alice', 10)")
+        conn.execute("INSERT INTO employees VALUES (2, 'Bob', 20)")
+        conn.commit()
+
+        sql = 'SELECT * FROM employees WHERE /* %include "condition.sql" */'
+        parser = TwoWaySQLParser(sql, base_path=sql_dir)
+        result = parser.parse({"dept_id": 10})
+
+        cursor = conn.execute(result.sql, result.params)
+        rows = [dict(row) for row in cursor.fetchall()]
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Alice"
+
+
+class TestUnionIntegration:
+    """UNION operation integration tests."""
+
+    def test_union_both_present(self, db: sqlite3.Connection) -> None:
+        """UNION with both queries."""
+        sql = """\
+SELECT * FROM employees WHERE dept_id = /* $dept1 */0
+UNION
+SELECT * FROM employees WHERE dept_id = /* $dept2 */0"""
+        result = parse_sql(sql, {"dept1": 10, "dept2": 20})
+        rows = _fetch_all(db, result)
+        assert len(rows) == 3
+
+    def test_union_second_removed(self, db: sqlite3.Connection) -> None:
+        """UNION with second query removed."""
+        sql = """\
+SELECT * FROM employees WHERE dept_id = /* $dept1 */0
+UNION
+SELECT * FROM employees WHERE dept_id = /* $dept2 */0"""
+        result = parse_sql(sql, {"dept1": 10, "dept2": None})
+        assert "UNION" not in result.sql
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+
+
+class TestTrailingDelimiterIntegration:
+    """Trailing delimiter removal integration tests."""
+
+    def test_trailing_and_removed(self, db: sqlite3.Connection) -> None:
+        """Trailing AND is removed when next line is removed."""
+        sql = """\
+SELECT * FROM employees
+WHERE
+    dept_id = /* $dept_id */0 AND
+    name = /* $name */'default'"""
+        result = parse_sql(sql, {"dept_id": 10, "name": None})
+        assert result.sql.strip().endswith("?")  # No trailing AND
+        rows = _fetch_all(db, result)
+        assert len(rows) == 2
+
+
+class TestNegativePositiveExtendedIntegration:
+    """Extended negative/positive evaluation integration tests."""
+
+    def test_false_is_negative(self, db: sqlite3.Connection) -> None:
+        """False is treated as negative for line removal."""
+        sql = """\
+SELECT * FROM employees
+WHERE
+    dept_id = /* $dept_id */0
+    AND name = /* name */'default'"""
+        result = parse_sql(sql, {"dept_id": False, "name": "Alice"})
+        assert "dept_id" not in result.sql
+        rows = _fetch_all(db, result)
+        assert len(rows) == 1
+
+    def test_empty_list_is_negative(self, db: sqlite3.Connection) -> None:
+        """Empty list is treated as negative for line removal (with $ modifier)."""
+        sql = """\
+SELECT * FROM employees
+WHERE
+    dept_id = /* $dept_id */0
+    AND name = /* name */'default'"""
+        result = parse_sql(sql, {"dept_id": [], "name": "Alice"})
+        assert "dept_id" not in result.sql
+        rows = _fetch_all(db, result)
+        assert len(rows) == 1
