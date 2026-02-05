@@ -71,7 +71,7 @@
 | TASK-046 | ✅ | M2 全機能の統合テスト作成 | TASK-007,TASK-009,TASK-011,TASK-013,TASK-015,TASK-017,TASK-019,TASK-021,TASK-023,TASK-025,TASK-027,TASK-029,TASK-031 |
 | TASK-047 | ✅ | README の API 例を Sqlym に更新 | TASK-007 |
 | TASK-048 | ✅ | ドキュメント更新（SPEC.md、SQL_SYNTAX.md） | TASK-046 |
-| TASK-049 | ⏳ | バージョンを 0.2.0 に更新しリリース準備 | TASK-048 |
+| TASK-049 | ✅ | バージョンを 0.2.0 に更新しリリース準備 | TASK-048 |
 
 ## タスク詳細（補足が必要な場合のみ）
 
