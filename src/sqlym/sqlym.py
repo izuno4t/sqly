@@ -169,6 +169,37 @@ class Sqlym:
         finally:
             cursor.close()
 
+    def insert(
+        self,
+        sql_path: str,
+        params: dict[str, Any] | None = None,
+    ) -> int | None:
+        """INSERT を実行し、自動生成された ID を返す.
+
+        Args:
+            sql_path: SQL ファイルパス（sql_dir からの相対パス）
+            params: パラメータ辞書
+
+        Returns:
+            自動生成された ID（lastrowid）、または None
+
+        """
+        sql_template = self._loader.load(sql_path, dialect=self._dialect)
+        result = parse_sql(
+            sql_template,
+            params or {},
+            dialect=self._dialect,
+        )
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(result.sql, result.params)
+            lastrowid = cursor.lastrowid
+            if self._auto_commit:
+                self._connection.commit()
+            return lastrowid
+        finally:
+            cursor.close()
+
     def _execute_query(
         self,
         sql_path: str,

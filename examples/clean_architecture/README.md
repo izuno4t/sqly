@@ -1,31 +1,31 @@
 # Clean Architecture Example
 
-sqlym を使った厳密な Clean Architecture の実装例。
+Clean Architecture implementation example using sqlym.
 
-## 構成
+## Structure
 
 ```
 clean_architecture/
 ├── main.py                              # Composition Root
-├── domain/                              # ドメイン層
-│   ├── models/                          # ドメインモデル
+├── domain/                              # Domain layer
+│   ├── models/                          # Domain models
 │   │   ├── user.py
 │   │   └── order.py
-│   └── repositories/                    # リポジトリインターフェース
+│   └── repositories/                    # Repository interfaces
 │       ├── user_repository.py
 │       └── order_repository.py
-├── application/                         # アプリケーション層
+├── application/                         # Application layer
 │   └── use_cases/
 │       ├── create_user.py
 │       └── create_order.py
-├── infrastructure/                      # インフラストラクチャ層
+├── infrastructure/                      # Infrastructure layer
 │   ├── dao/
-│   │   ├── entities/                    # 永続化エンティティ
+│   │   ├── entities/                    # Persistence entities
 │   │   │   ├── user_entity.py
 │   │   │   └── order_entity.py
 │   │   ├── user_dao.py                  # DAO (sqlym)
 │   │   └── order_dao.py
-│   └── repositories/                    # リポジトリ実装
+│   └── repositories/                    # Repository implementations
 │       ├── user_repository.py
 │       └── order_repository.py
 └── sql/
@@ -33,27 +33,27 @@ clean_architecture/
 
 ## Model vs Entity
 
-| 種類 | 場所 | 役割 |
-|------|------|------|
-| Model | domain/models/ | ビジネスロジック、ドメインルール |
-| Entity | infrastructure/dao/entities/ | DBテーブルへのマッピング |
+| Type | Location | Purpose |
+|------|----------|---------|
+| Model | domain/models/ | Business logic, domain rules |
+| Entity | infrastructure/dao/entities/ | DB table mapping |
 
-## データフロー
+## Data Flow
 
 ```
 DB ──(SQL)──▶ DAO ──(Entity)──▶ Repository ──(Model)──▶ UseCase
                                      │
-                              Entity → Model 変換
+                              Entity → Model conversion
 ```
 
-## 実行
+## Run
 
 ```bash
 cd examples/clean_architecture
 PYTHONPATH="../../src:." uv run python main.py
 ```
 
-## コード例
+## Code Examples
 
 ### Entity (infrastructure/dao/entities)
 
