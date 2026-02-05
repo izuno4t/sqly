@@ -193,7 +193,16 @@ class TwoWaySQLParser:
         逆順に走査することで、孫→子→親の順で伝播を実現する。
         子を持つ行が削除された場合、その兄弟でパラメータも子も持たない行
         （閉じ括弧など）も削除対象とする。収束するまで繰り返す。
+
+        例外: SELECT/INSERT/UPDATE/DELETE で始まる行はパラメータを含まない場合でも
+        削除対象外とする（CTE 内の SELECT 行を保護）。
         """
+        # SELECT/INSERT/UPDATE/DELETE で始まる行は保護対象
+        protected_keywords = re.compile(
+            r"^(?:SELECT|INSERT|UPDATE|DELETE)\b",
+            re.IGNORECASE,
+        )
+
         changed = True
         while changed:
             changed = False
@@ -203,6 +212,9 @@ class TwoWaySQLParser:
                 if not unit.children:
                     # 子を持たない行: 親があり、兄弟が全て removed なら自身も削除
                     if unit.parent and not tokenize(unit.content):
+                        # SELECT 等で始まる行は保護（CTE 内の SELECT を残す）
+                        if protected_keywords.match(unit.content):
+                            continue
                         siblings = unit.parent.children
                         others = [s for s in siblings if s is not unit]
                         if others and all(s.removed for s in others):
@@ -210,6 +222,9 @@ class TwoWaySQLParser:
                             changed = True
                     continue
                 if all(child.removed for child in unit.children):
+                    # SELECT 等で始まる行は保護（CTE 内の SELECT を残す）
+                    if protected_keywords.match(unit.content):
+                        continue
                     unit.removed = True
                     changed = True
 
@@ -301,6 +316,23 @@ class TwoWaySQLParser:
                         token, value, is_named
                     )
                     line = line[: token.start] + replacement + line[token.end :]
+                    if is_named:
+                        named_bind_params.update(named_expanded)
+                    else:
+                        for v in reversed(expanded):
+                            line_params.insert(0, v)
+                elif token.is_like or token.is_not_like:
+                    # LIKE 句のリスト展開
+                    col_expr = self._extract_column_before_token(line, token.start)
+                    replacement, expanded, named_expanded = self._expand_like(
+                        token, value, col_expr, is_named
+                    )
+                    # 列式を含めて置換
+                    col_start = token.start - len(col_expr) - 1  # スペース分
+                    # 列式の開始位置を正確に計算
+                    prefix = line[:token.start].rstrip()
+                    col_start = len(prefix) - len(col_expr)
+                    line = line[:col_start] + replacement + line[token.end :]
                     if is_named:
                         named_bind_params.update(named_expanded)
                     else:
@@ -418,6 +450,80 @@ class TwoWaySQLParser:
         if is_named:
             return f"{op} :{token.name}", [], {token.name: value}
         return f"{op} {self.placeholder}", [value], {}
+
+    def _extract_column_before_token(self, line: str, token_start: int) -> str:
+        """トークン前の列式を抽出する.
+
+        Args:
+            line: SQL行文字列
+            token_start: トークンの開始位置
+
+        Returns:
+            列式文字列（例: "FIELD1", "t.name"）
+
+        """
+        prefix = line[:token_start].rstrip()
+        # 末尾の識別子を抽出
+        extracted = self._extract_in_clause_column(line, token_start)
+        if extracted:
+            return extracted[0]
+        # フォールバック: 最後の単語を取得
+        match = re.search(r"(\w+(?:\.\w+)?)\s*$", prefix)
+        if match:
+            return match.group(1)
+        return ""
+
+    def _expand_like(
+        self,
+        token: Any,
+        value: Any,
+        col_expr: str,
+        is_named: bool,
+    ) -> tuple[str, list[Any], dict[str, Any]]:
+        """LIKE 句を値に応じて展開する.
+
+        スカラー値の場合: col LIKE ?
+        リスト値の場合: (col LIKE ? OR col LIKE ? OR ...)
+        NOT LIKE の場合: (col NOT LIKE ? AND col NOT LIKE ? AND ...)
+
+        Args:
+            token: パラメータトークン
+            value: パラメータ値
+            col_expr: 列式
+            is_named: 名前付きプレースホルダを使用するか
+
+        Returns:
+            (置換文字列, バインドパラメータリスト, 名前付きパラメータ辞書) のタプル
+
+        """
+        like_kw = "NOT LIKE" if token.is_not_like else "LIKE"
+        joiner = " AND " if token.is_not_like else " OR "
+
+        # スカラー値または None
+        if not isinstance(value, list):
+            if is_named:
+                return f"{col_expr} {like_kw} :{token.name}", [], {token.name: value}
+            return f"{col_expr} {like_kw} {self.placeholder}", [value], {}
+
+        # 空リスト
+        if not value:
+            # 空リストの場合: LIKE は常に偽 (1=0)、NOT LIKE は常に真 (1=1)
+            if token.is_not_like:
+                return "1=1", [], {}
+            return "1=0", [], {}
+
+        # リスト値 → OR/AND 展開
+        if is_named:
+            named: dict[str, Any] = {}
+            parts: list[str] = []
+            for i, v in enumerate(value):
+                key = f"{token.name}_{i}"
+                named[key] = v
+                parts.append(f"{col_expr} {like_kw} :{key}")
+            return f"({joiner.join(parts)})", [], named
+
+        parts = [f"{col_expr} {like_kw} {self.placeholder}" for _ in value]
+        return f"({joiner.join(parts)})", list(value), {}
 
     def _expand_in_clause(self, values: list[Any]) -> tuple[str, list[Any]]:
         """IN句のリストをプレースホルダに展開する.

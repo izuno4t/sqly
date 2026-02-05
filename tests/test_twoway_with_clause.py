@@ -55,13 +55,7 @@ SELECT * FROM filtered"""
         assert result.params == ["enabled"]
 
     def test_with_clause_all_conditions_none(self) -> None:
-        """WITH 句内の条件が全て None なら WHERE ごと削除.
-
-        NOTE: 現在の実装では CTE 全体が削除されてしまう問題がある。
-        理想的には WITH filtered AS (SELECT * FROM users) SELECT * FROM filtered
-        となるべきだが、親子関係の伝播により CTE ごと削除される。
-        この挙動は将来的に修正が必要。
-        """
+        """WITH 句内の条件が全て None なら WHERE ごと削除、SELECT は残る."""
         sql = """\
 WITH filtered AS (
     SELECT * FROM users
@@ -72,10 +66,10 @@ WITH filtered AS (
 SELECT * FROM filtered"""
         parser = TwoWaySQLParser(sql)
         result = parser.parse({"status": None, "dept_id": None})
-        # 現状: CTE 全体が削除されてしまう（不正な SQL になる）
-        # TODO: 将来的には CTE 内の SELECT は残すべき
-        assert "WITH" not in result.sql
-        assert result.sql.strip() == "SELECT * FROM filtered"
+        # CTE 内の SELECT は保持され、WHERE のみ削除される
+        assert "WITH" in result.sql
+        assert "SELECT * FROM users" in result.sql
+        assert "WHERE" not in result.sql
         assert result.params == []
 
 
@@ -166,9 +160,10 @@ WITH filtered AS (
 SELECT * FROM filtered"""
         parser = TwoWaySQLParser(sql)
         result = parser.parse({"dept_ids": []})
-        # 空リストは negative なので行削除、親も削除され WITH 句全体が消える
-        assert "WITH" not in result.sql
-        assert result.sql.strip() == "SELECT * FROM filtered"
+        # 空リストは negative なので行削除、WHERE は削除されるが SELECT は残る
+        assert "WITH" in result.sql
+        assert "SELECT * FROM users" in result.sql
+        assert "WHERE" not in result.sql
 
 
 class TestWithClauseComplex:

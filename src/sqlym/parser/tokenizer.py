@@ -70,6 +70,19 @@ OPERATOR_PATTERN = re.compile(
     r")"
 )
 
+# LIKE パターン（/* param */LIKE 形式）
+# col /* param */LIKE 'pattern' : リスト値の場合 OR 展開
+# col /* param */NOT LIKE 'pattern' : リスト値の場合 AND 展開（NOT LIKE ... AND NOT LIKE ...）
+LIKE_PATTERN = re.compile(
+    r"/\*\s*([$&@?!]+)?(\w+)\s*\*/\s*"
+    r"(NOT\s+)?LIKE\s+"  # LIKE or NOT LIKE
+    r"("
+    r"'(?:''|[^'])*'"  # 'string' (SQL escape: '')
+    r'|"(?:\"\"|[^"])*"'  # "string" (SQL escape: "")
+    r")",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class Token:
@@ -113,6 +126,12 @@ class Token:
 
     is_partial_in: bool = False
     """IN句内の部分パラメータか（固定値 + パラメータ混在）."""
+
+    is_like: bool = False
+    """LIKE パターンか（リスト値で OR 展開）."""
+
+    is_not_like: bool = False
+    """NOT LIKE パターンか（リスト値で AND 展開）."""
 
 
 def _parse_modifiers(modifiers: str | None) -> dict[str, bool]:
@@ -196,6 +215,34 @@ def tokenize(line: str) -> list[Token]:
                 required=flags["required"],
                 fallback=flags["fallback"],
                 operator=operator,
+            )
+        )
+        used_ranges.append((m.start(), m.end()))
+
+    # LIKE パターン（/* param */LIKE 形式）
+    for m in LIKE_PATTERN.finditer(line):
+        if _overlaps(m.start(), m.end(), used_ranges):
+            continue
+        modifiers = m.group(1)
+        name = m.group(2)
+        not_prefix = m.group(3)  # "NOT " or None
+        default = m.group(4)
+        flags = _parse_modifiers(modifiers)
+        is_not = not_prefix is not None
+        tokens.append(
+            Token(
+                name=name,
+                removable=flags["removable"],
+                default=default,
+                is_in_clause=False,
+                start=m.start(),
+                end=m.end(),
+                bindless=flags["bindless"],
+                negated=flags["negated"],
+                required=flags["required"],
+                fallback=flags["fallback"],
+                is_like=not is_not,
+                is_not_like=is_not,
             )
         )
         used_ranges.append((m.start(), m.end()))

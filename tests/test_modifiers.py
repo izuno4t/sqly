@@ -611,3 +611,90 @@ class TestPartialInExpansion:
         assert "'X'" in result.sql
         assert "'Y'" in result.sql
         assert result.params == ["A", "B"]
+
+
+class TestLikeListExpansion:
+    """LIKE 句のリスト展開（OR 展開）テスト."""
+
+    def test_like_with_scalar(self) -> None:
+        """LIKE とスカラー値."""
+        sql = "SELECT * FROM users WHERE name /* param */LIKE 'pattern'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": "A%"})
+        assert "name LIKE ?" in result.sql
+        assert result.params == ["A%"]
+
+    def test_like_with_list(self) -> None:
+        """LIKE とリスト値 → OR 展開."""
+        sql = "SELECT * FROM users WHERE name /* param */LIKE 'pattern'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": ["a%", "b%", "c%"]})
+        assert "(name LIKE ? OR name LIKE ? OR name LIKE ?)" in result.sql
+        assert result.params == ["a%", "b%", "c%"]
+
+    def test_like_with_empty_list(self) -> None:
+        """LIKE と空リスト → 1=0."""
+        sql = "SELECT * FROM users WHERE name /* param */LIKE 'pattern'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": []})
+        assert "1=0" in result.sql
+        assert result.params == []
+
+    def test_not_like_with_list(self) -> None:
+        """NOT LIKE とリスト値 → AND 展開."""
+        sql = "SELECT * FROM users WHERE name /* param */NOT LIKE 'pattern'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": ["a%", "b%"]})
+        assert "(name NOT LIKE ? AND name NOT LIKE ?)" in result.sql
+        assert result.params == ["a%", "b%"]
+
+    def test_not_like_with_empty_list(self) -> None:
+        """NOT LIKE と空リスト → 1=1."""
+        sql = "SELECT * FROM users WHERE name /* param */NOT LIKE 'pattern'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": []})
+        assert "1=1" in result.sql
+        assert result.params == []
+
+    def test_like_tokenizer_recognizes(self) -> None:
+        """Tokenizer が LIKE パターンを認識する."""
+        tokens = tokenize("/* param */LIKE 'pattern'")
+        assert len(tokens) == 1
+        assert tokens[0].is_like is True
+        assert tokens[0].is_not_like is False
+        assert tokens[0].name == "param"
+
+    def test_not_like_tokenizer_recognizes(self) -> None:
+        """Tokenizer が NOT LIKE パターンを認識する."""
+        tokens = tokenize("/* param */NOT LIKE 'pattern'")
+        assert len(tokens) == 1
+        assert tokens[0].is_like is False
+        assert tokens[0].is_not_like is True
+
+    def test_like_named_placeholder(self) -> None:
+        """名前付きプレースホルダでの LIKE 展開."""
+        sql = "SELECT * FROM users WHERE name /* param */LIKE 'pattern'"
+        parser = TwoWaySQLParser(sql, placeholder=":name")
+        result = parser.parse({"param": ["a%", "b%"]})
+        assert "(name LIKE :param_0 OR name LIKE :param_1)" in result.sql
+        assert result.named_params == {"param_0": "a%", "param_1": "b%"}
+
+    def test_like_with_table_alias(self) -> None:
+        """テーブルエイリアス付きカラムでの LIKE 展開."""
+        sql = "SELECT * FROM users u WHERE u.name /* param */LIKE 'pattern'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": ["a%", "b%"]})
+        assert "(u.name LIKE ? OR u.name LIKE ?)" in result.sql
+
+    def test_like_with_removable_modifier(self) -> None:
+        """$ 修飾子付き LIKE."""
+        sql = """\
+SELECT * FROM users
+WHERE
+    id = /* id */1
+    AND name /* $param */LIKE 'pattern'"""
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"id": 1, "param": None})
+        # $ 付きで None なので行削除
+        assert "LIKE" not in result.sql
+        assert result.params == [1]
