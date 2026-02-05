@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 import pytest
 
-from sqly import Column, Dialect, ParsedSQL, SqlLoader, create_mapper, parse_sql
+from sqly import Column, Dialect, ParsedSQL, SqlLoader, create_mapper, escape_like, parse_sql
 from sqly.mapper.column import entity
 
 pytestmark = pytest.mark.oracle
@@ -353,3 +353,177 @@ class TestNullHandling:
         employees = mapper.map_rows(rows)
         assert len(employees) == 1
         assert employees[0] == Employee(id=4, name="Diana", dept_id=None)
+
+
+class TestDialectInClauseSplit:
+    """IN 句分割統合テスト (TASK-033)."""
+
+    @pytest.fixture
+    def db_large(self, oracle_conn: Any) -> Any:
+        """大量データ用テーブル."""
+        cur = oracle_conn.cursor()
+        cur.execute("""
+            BEGIN
+                EXECUTE IMMEDIATE 'DROP TABLE large_data';
+            EXCEPTION
+                WHEN OTHERS THEN
+                    IF SQLCODE != -942 THEN RAISE; END IF;
+            END;
+        """)
+        cur.execute("""
+            CREATE TABLE large_data (
+                id NUMBER PRIMARY KEY,
+                val VARCHAR2(10)
+            )
+        """)
+        # 1500件挿入（1000件制限を超える）
+        cur.executemany(
+            "INSERT INTO large_data (id, val) VALUES (:1, :2)",
+            [(i, f"v{i}") for i in range(1, 1501)],
+        )
+        oracle_conn.commit()
+        yield oracle_conn
+        cur.execute("DROP TABLE large_data")
+        oracle_conn.commit()
+
+    def test_in_clause_split_over_1000(self, db_large: Any) -> None:
+        """1000件超のIN句が自動分割される."""
+        ids = list(range(1, 1201))  # 1200件
+        sql = "SELECT COUNT(*) as cnt FROM large_data WHERE id IN /* $ids */(999)"
+        result = parse_sql(sql, {"ids": ids}, dialect=Dialect.ORACLE)
+        # SQL が分割されているか確認（OR が含まれる）
+        assert " OR " in result.sql
+        cur = db_large.cursor()
+        cur.execute(result.sql, result.named_params)
+        row = cur.fetchone()
+        assert row[0] == 1200
+
+    def test_in_clause_no_split_under_1000(self, db_large: Any) -> None:
+        """1000件以下のIN句は分割されない."""
+        ids = list(range(1, 501))  # 500件
+        sql = "SELECT COUNT(*) as cnt FROM large_data WHERE id IN /* $ids */(999)"
+        result = parse_sql(sql, {"ids": ids}, dialect=Dialect.ORACLE)
+        # SQL が分割されていないか確認（OR が含まれない）
+        assert " OR " not in result.sql
+        cur = db_large.cursor()
+        cur.execute(result.sql, result.named_params)
+        row = cur.fetchone()
+        assert row[0] == 500
+
+    def test_in_clause_exact_1000(self, db_large: Any) -> None:
+        """ちょうど1000件のIN句は分割されない."""
+        ids = list(range(1, 1001))  # 1000件
+        sql = "SELECT COUNT(*) as cnt FROM large_data WHERE id IN /* $ids */(999)"
+        result = parse_sql(sql, {"ids": ids}, dialect=Dialect.ORACLE)
+        assert " OR " not in result.sql
+        cur = db_large.cursor()
+        cur.execute(result.sql, result.named_params)
+        row = cur.fetchone()
+        assert row[0] == 1000
+
+
+class TestDialectLikeEscape:
+    """LIKE エスケープ統合テスト (TASK-034)."""
+
+    @pytest.fixture
+    def db_with_special_names(self, oracle_conn: Any) -> Any:
+        """特殊文字を含む名前のテストデータ."""
+        cur = oracle_conn.cursor()
+        cur.execute("""
+            BEGIN
+                EXECUTE IMMEDIATE 'DROP TABLE products';
+            EXCEPTION
+                WHEN OTHERS THEN
+                    IF SQLCODE != -942 THEN RAISE; END IF;
+            END;
+        """)
+        cur.execute("""
+            CREATE TABLE products (
+                id NUMBER PRIMARY KEY,
+                name VARCHAR2(255) NOT NULL
+            )
+        """)
+        cur.executemany(
+            "INSERT INTO products (id, name) VALUES (:1, :2)",
+            [
+                (1, "10% OFF Sale"),
+                (2, "Product_A"),
+                (3, "C# Programming"),
+                (4, "Normal Product"),
+                (5, "100％達成"),  # 全角パーセント
+            ],
+        )
+        oracle_conn.commit()
+        yield oracle_conn
+        cur.execute("DROP TABLE products")
+        oracle_conn.commit()
+
+    def test_like_escape_percent(self, db_with_special_names: Any) -> None:
+        """% を含む値を LIKE 検索."""
+        search = escape_like("10%", Dialect.ORACLE)
+        sql = "SELECT * FROM products WHERE name LIKE /* $pattern */'%' ESCAPE '#'"
+        result = parse_sql(sql, {"pattern": f"{search}%"}, dialect=Dialect.ORACLE)
+        cur = db_with_special_names.cursor()
+        cur.execute(result.sql, result.named_params)
+        cur.rowfactory = lambda *args: dict(zip([d[0].lower() for d in cur.description], args))
+        rows = list(cur.fetchall())
+        assert len(rows) == 1
+        assert rows[0]["name"] == "10% OFF Sale"
+
+    def test_like_escape_fullwidth_percent(self, db_with_special_names: Any) -> None:
+        """全角％を含む値を LIKE 検索（Oracle固有）."""
+        search = escape_like("100％", Dialect.ORACLE)
+        sql = "SELECT * FROM products WHERE name LIKE /* $pattern */'%' ESCAPE '#'"
+        result = parse_sql(sql, {"pattern": f"{search}%"}, dialect=Dialect.ORACLE)
+        cur = db_with_special_names.cursor()
+        cur.execute(result.sql, result.named_params)
+        cur.rowfactory = lambda *args: dict(zip([d[0].lower() for d in cur.description], args))
+        rows = list(cur.fetchall())
+        assert len(rows) == 1
+        assert rows[0]["name"] == "100％達成"
+
+
+class TestDialectSqlLoaderIntegration:
+    """Dialect 別 SQL ファイルロード統合テスト (TASK-035)."""
+
+    def test_dialect_specific_file(self, db: Any, tmp_path: Path) -> None:
+        """Dialect 固有ファイルが優先される."""
+        sql_dir = tmp_path / "sql"
+        sql_dir.mkdir()
+        # 汎用ファイル
+        (sql_dir / "count.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees",
+            encoding="utf-8",
+        )
+        # Oracle 固有ファイル（ROWNUM使用）
+        (sql_dir / "count.oracle.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees WHERE ROWNUM <= 3",
+            encoding="utf-8",
+        )
+
+        loader = SqlLoader(sql_dir)
+        sql_template = loader.load("count.sql", dialect=Dialect.ORACLE)
+        result = parse_sql(sql_template, {}, dialect=Dialect.ORACLE)
+        cur = db.cursor()
+        cur.execute(result.sql, result.named_params)
+        row = cur.fetchone()
+        # Oracle 固有ファイルが使われ、ROWNUM <= 3 で3件
+        assert row[0] == 3
+
+    def test_dialect_fallback_to_generic(self, db: Any, tmp_path: Path) -> None:
+        """Dialect 固有ファイルがなければ汎用ファイルにフォールバック."""
+        sql_dir = tmp_path / "sql"
+        sql_dir.mkdir()
+        (sql_dir / "count.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees",
+            encoding="utf-8",
+        )
+
+        loader = SqlLoader(sql_dir)
+        # PostgreSQL固有ファイルは存在しないのでフォールバック
+        sql_template = loader.load("count.sql", dialect=Dialect.POSTGRESQL)
+        result = parse_sql(sql_template, {}, dialect=Dialect.ORACLE)  # 実行はOracle
+        cur = db.cursor()
+        cur.execute(result.sql, result.named_params)
+        row = cur.fetchone()
+        assert row[0] == 4

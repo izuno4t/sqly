@@ -58,7 +58,7 @@
 | TASK-033 | ✅ | IN句展開時のDB固有上限分割を実装しテストする（Oracle 1000件制限対応） | TASK-032, TASK-008 |
 | TASK-034 | ✅ | LIKEパラメータのエスケープ処理を実装しテストする | TASK-032 |
 | TASK-035 | ✅ | SqlLoaderにRDBMS別SQLファイルロードを追加しテストする | TASK-032, TASK-016 |
-| TASK-036 | ⏳ | Dialect拡張機能の統合テストを作成する（全RDBMS） | TASK-033, TASK-034, TASK-035 |
+| TASK-036 | ✅ | Dialect拡張機能の統合テストを作成する（全RDBMS） | TASK-033, TASK-034, TASK-035 |
 
 ## タスク詳細（補足が必要な場合のみ）
 
@@ -209,6 +209,10 @@
 
 - 補足: TASK-033〜035 で追加した Dialect 機能の統合テストを全 RDBMS（SQLite/PostgreSQL/MySQL/Oracle）で実施
 - 注意: IN 句分割・LIKE エスケープ・SQL ファイルロードを各 DB で実行検証する
+- 実装済み: 各統合テストファイルに以下を追加
+  - `TestDialectLikeEscape`: LIKE エスケープ機能テスト（全DB）
+  - `TestDialectSqlLoaderIntegration`: Dialect 別 SQL ファイルロードテスト（全DB）
+  - `TestDialectInClauseSplit`: IN 句分割テスト（Oracle のみ、1000件制限）
 
 ## Backlog（Doma2 相当の Dialect 拡張）
 

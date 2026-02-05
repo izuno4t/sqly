@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 import pytest
 
-from sqly import Column, Dialect, ParsedSQL, SqlLoader, create_mapper, parse_sql
+from sqly import Column, Dialect, ParsedSQL, SqlLoader, create_mapper, escape_like, parse_sql
 from sqly.mapper.column import entity
 
 pytestmark = pytest.mark.postgresql
@@ -333,3 +333,92 @@ class TestNullHandling:
         employees = mapper.map_rows(rows)
         assert len(employees) == 1
         assert employees[0] == Employee(id=4, name="Diana", dept_id=None)
+
+
+class TestDialectLikeEscape:
+    """LIKE エスケープ統合テスト (TASK-034)."""
+
+    @pytest.fixture
+    def db_with_special_names(self, pg_conn: Any) -> Any:
+        """特殊文字を含む名前のテストデータ."""
+        cur = pg_conn.cursor()
+        cur.execute("DROP TABLE IF EXISTS products")
+        cur.execute("""
+            CREATE TABLE products (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL
+            )
+        """)
+        cur.executemany(
+            "INSERT INTO products (id, name) VALUES (%s, %s)",
+            [
+                (1, "10% OFF Sale"),
+                (2, "Product_A"),
+                (3, "C# Programming"),
+                (4, "Normal Product"),
+            ],
+        )
+        pg_conn.commit()
+        yield pg_conn
+        cur.execute("DROP TABLE IF EXISTS products")
+        pg_conn.commit()
+
+    def test_like_escape_percent(self, db_with_special_names: Any) -> None:
+        """% を含む値を LIKE 検索."""
+        search = escape_like("10%", Dialect.POSTGRESQL)
+        sql = "SELECT * FROM products WHERE name LIKE /* $pattern */'%' ESCAPE '#'"
+        result = parse_sql(sql, {"pattern": f"{search}%"}, dialect=Dialect.POSTGRESQL)
+        rows = _fetch_all(db_with_special_names, result)
+        assert len(rows) == 1
+        assert rows[0]["name"] == "10% OFF Sale"
+
+    def test_like_escape_underscore(self, db_with_special_names: Any) -> None:
+        """_ を含む値を LIKE 検索."""
+        search = escape_like("Product_", Dialect.POSTGRESQL)
+        sql = "SELECT * FROM products WHERE name LIKE /* $pattern */'%' ESCAPE '#'"
+        result = parse_sql(sql, {"pattern": f"{search}%"}, dialect=Dialect.POSTGRESQL)
+        rows = _fetch_all(db_with_special_names, result)
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Product_A"
+
+
+class TestDialectSqlLoaderIntegration:
+    """Dialect 別 SQL ファイルロード統合テスト (TASK-035)."""
+
+    def test_dialect_specific_file(self, db: Any, tmp_path: Path) -> None:
+        """Dialect 固有ファイルが優先される."""
+        sql_dir = tmp_path / "sql"
+        sql_dir.mkdir()
+        # 汎用ファイル
+        (sql_dir / "count.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees",
+            encoding="utf-8",
+        )
+        # PostgreSQL 固有ファイル（LIMIT使用）
+        (sql_dir / "count.postgresql.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees LIMIT 3",
+            encoding="utf-8",
+        )
+
+        loader = SqlLoader(sql_dir)
+        sql_template = loader.load("count.sql", dialect=Dialect.POSTGRESQL)
+        result = parse_sql(sql_template, {}, dialect=Dialect.POSTGRESQL)
+        rows = _fetch_all(db, result)
+        # PostgreSQL 固有ファイルが使われ、LIMIT 3 で3件
+        assert rows[0]["cnt"] == 3
+
+    def test_dialect_fallback_to_generic(self, db: Any, tmp_path: Path) -> None:
+        """Dialect 固有ファイルがなければ汎用ファイルにフォールバック."""
+        sql_dir = tmp_path / "sql"
+        sql_dir.mkdir()
+        (sql_dir / "count.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees",
+            encoding="utf-8",
+        )
+
+        loader = SqlLoader(sql_dir)
+        # MySQL固有ファイルは存在しないのでフォールバック
+        sql_template = loader.load("count.sql", dialect=Dialect.MYSQL)
+        result = parse_sql(sql_template, {}, dialect=Dialect.POSTGRESQL)  # 実行はPostgreSQL
+        rows = _fetch_all(db, result)
+        assert rows[0]["cnt"] == 4

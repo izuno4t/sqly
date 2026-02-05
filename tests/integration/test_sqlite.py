@@ -9,7 +9,7 @@ from typing import Annotated
 
 import pytest
 
-from sqly import Column, ParsedSQL, SqlLoader, create_mapper, parse_sql
+from sqly import Column, Dialect, ParsedSQL, SqlLoader, create_mapper, escape_like, parse_sql
 from sqly.mapper.column import entity
 
 
@@ -326,3 +326,113 @@ class TestNullHandling:
         employees = mapper.map_rows(rows)
         assert len(employees) == 1
         assert employees[0] == Employee(id=4, name="Diana", dept_id=None)
+
+
+class TestDialectLikeEscape:
+    """LIKE エスケープ統合テスト (TASK-034)."""
+
+    @pytest.fixture
+    def db_with_special_names(self) -> sqlite3.Connection:
+        """特殊文字を含む名前のテストデータ."""
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.execute("""
+            CREATE TABLE products (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            )
+        """)
+        conn.executemany(
+            "INSERT INTO products (id, name) VALUES (?, ?)",
+            [
+                (1, "10% OFF Sale"),
+                (2, "Product_A"),
+                (3, "C# Programming"),
+                (4, "Normal Product"),
+                (5, "100% Pure"),
+            ],
+        )
+        conn.commit()
+        return conn
+
+    def test_like_escape_percent(self, db_with_special_names: sqlite3.Connection) -> None:
+        """% を含む値を LIKE 検索."""
+        search = escape_like("10%", Dialect.SQLITE)
+        sql = "SELECT * FROM products WHERE name LIKE /* $pattern */'%' ESCAPE '#'"
+        result = parse_sql(sql, {"pattern": f"{search}%"}, dialect=Dialect.SQLITE)
+        cursor = db_with_special_names.execute(result.sql, result.params)
+        rows = [dict(row) for row in cursor.fetchall()]
+        assert len(rows) == 1
+        assert rows[0]["name"] == "10% OFF Sale"
+
+    def test_like_escape_underscore(self, db_with_special_names: sqlite3.Connection) -> None:
+        """_ を含む値を LIKE 検索."""
+        search = escape_like("Product_", Dialect.SQLITE)
+        sql = "SELECT * FROM products WHERE name LIKE /* $pattern */'%' ESCAPE '#'"
+        result = parse_sql(sql, {"pattern": f"{search}%"}, dialect=Dialect.SQLITE)
+        cursor = db_with_special_names.execute(result.sql, result.params)
+        rows = [dict(row) for row in cursor.fetchall()]
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Product_A"
+
+    def test_like_escape_hash(self, db_with_special_names: sqlite3.Connection) -> None:
+        """# を含む値を LIKE 検索."""
+        search = escape_like("C#", Dialect.SQLITE)
+        sql = "SELECT * FROM products WHERE name LIKE /* $pattern */'%' ESCAPE '#'"
+        result = parse_sql(sql, {"pattern": f"{search}%"}, dialect=Dialect.SQLITE)
+        cursor = db_with_special_names.execute(result.sql, result.params)
+        rows = [dict(row) for row in cursor.fetchall()]
+        assert len(rows) == 1
+        assert rows[0]["name"] == "C# Programming"
+
+    def test_like_without_escape(self, db_with_special_names: sqlite3.Connection) -> None:
+        """エスケープなしの通常 LIKE 検索."""
+        sql = "SELECT * FROM products WHERE name LIKE /* $pattern */'%' ESCAPE '#'"
+        result = parse_sql(sql, {"pattern": "%Product%"}, dialect=Dialect.SQLITE)
+        cursor = db_with_special_names.execute(result.sql, result.params)
+        rows = [dict(row) for row in cursor.fetchall()]
+        assert len(rows) == 2
+        names = {r["name"] for r in rows}
+        assert names == {"Product_A", "Normal Product"}
+
+
+class TestDialectSqlLoaderIntegration:
+    """Dialect 別 SQL ファイルロード統合テスト (TASK-035)."""
+
+    def test_dialect_specific_file(self, db: sqlite3.Connection, tmp_path: Path) -> None:
+        """Dialect 固有ファイルが優先される."""
+        sql_dir = tmp_path / "sql"
+        sql_dir.mkdir()
+        # 汎用ファイル
+        (sql_dir / "count.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees",
+            encoding="utf-8",
+        )
+        # SQLite 固有ファイル
+        (sql_dir / "count.sqlite.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees WHERE dept_id IS NOT NULL",
+            encoding="utf-8",
+        )
+
+        loader = SqlLoader(sql_dir)
+        sql_template = loader.load("count.sql", dialect=Dialect.SQLITE)
+        result = parse_sql(sql_template, {}, dialect=Dialect.SQLITE)
+        rows = _fetch_all(db, result)
+        # SQLite 固有ファイルが使われ、dept_id IS NOT NULL で3件
+        assert rows[0]["cnt"] == 3
+
+    def test_dialect_fallback_to_generic(self, db: sqlite3.Connection, tmp_path: Path) -> None:
+        """Dialect 固有ファイルがなければ汎用ファイルにフォールバック."""
+        sql_dir = tmp_path / "sql"
+        sql_dir.mkdir()
+        (sql_dir / "count.sql").write_text(
+            "SELECT COUNT(*) as cnt FROM employees",
+            encoding="utf-8",
+        )
+
+        loader = SqlLoader(sql_dir)
+        # MySQL固有ファイルは存在しないのでフォールバック
+        sql_template = loader.load("count.sql", dialect=Dialect.MYSQL)
+        result = parse_sql(sql_template, {}, dialect=Dialect.SQLITE)  # 実行はSQLite
+        rows = _fetch_all(db, result)
+        assert rows[0]["cnt"] == 4
