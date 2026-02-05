@@ -53,6 +53,23 @@ IN_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# 比較演算子パターン（/* param */= 形式）
+# col /* param */= 'default' : 値に応じて =, IS NULL, IN に自動変換
+# col /* param */<> 'default' : 値に応じて <>, IS NOT NULL, NOT IN に自動変換
+OPERATOR_PATTERN = re.compile(
+    r"/\*\s*([$&@?!]+)?(\w+)\s*\*/\s*"
+    r"(=|<>|!=)"  # 比較演算子
+    r"\s*"
+    r"("
+    r"'(?:''|[^'])*'"  # 'string' (SQL escape: '')
+    r'|"(?:\"\"|[^"])*"'  # "string" (SQL escape: "")
+    r"|\d+(?:\.\d+)?"  # number
+    r"|\w+"  # identifier
+    r"|\([^)]*\)"  # (list)
+    r"|NULL"  # NULL
+    r")"
+)
+
 
 @dataclass(frozen=True)
 class Token:
@@ -91,6 +108,9 @@ class Token:
     fallback_names: tuple[str, ...] = ()
     """フォールバックチェーン（?a ?b ?c の場合 ('a', 'b', 'c')）."""
 
+    operator: str | None = None
+    """比較演算子（=, <>, != など）。自動変換対象の場合に設定."""
+
 
 def _parse_modifiers(modifiers: str | None) -> dict[str, bool]:
     """修飾記号文字列をパースしてフラグ辞書を返す."""
@@ -114,8 +134,11 @@ def _parse_modifiers(modifiers: str | None) -> dict[str, bool]:
 def tokenize(line: str) -> list[Token]:
     """行からパラメータトークンを抽出する.
 
-    IN句パターンを先にマッチし、次にフォールバックパターン、
-    最後に通常パラメータパターンを重複しない範囲でマッチさせる。
+    マッチ優先順位:
+    1. IN句パターン
+    2. 比較演算子パターン（/* param */= 形式）
+    3. フォールバックパターン
+    4. 通常パラメータパターン
 
     Args:
         line: SQL行文字列
@@ -144,6 +167,32 @@ def tokenize(line: str) -> list[Token]:
                 negated=flags["negated"],
                 required=flags["required"],
                 fallback=flags["fallback"],
+            )
+        )
+        used_ranges.append((m.start(), m.end()))
+
+    # 比較演算子パターン（/* param */= 形式）
+    for m in OPERATOR_PATTERN.finditer(line):
+        if _overlaps(m.start(), m.end(), used_ranges):
+            continue
+        modifiers = m.group(1)
+        name = m.group(2)
+        operator = m.group(3)  # =, <>, !=
+        default = m.group(4)
+        flags = _parse_modifiers(modifiers)
+        tokens.append(
+            Token(
+                name=name,
+                removable=flags["removable"],
+                default=default,
+                is_in_clause=False,
+                start=m.start(),
+                end=m.end(),
+                bindless=flags["bindless"],
+                negated=flags["negated"],
+                required=flags["required"],
+                fallback=flags["fallback"],
+                operator=operator,
             )
         )
         used_ranges.append((m.start(), m.end()))

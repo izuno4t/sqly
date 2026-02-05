@@ -295,6 +295,17 @@ class TwoWaySQLParser:
                             named_bind_params[token.name] = value
                         else:
                             line_params.insert(0, value)
+                elif token.operator:
+                    # 比較演算子の自動変換
+                    replacement, expanded, named_expanded = self._convert_operator(
+                        token, value, is_named
+                    )
+                    line = line[: token.start] + replacement + line[token.end :]
+                    if is_named:
+                        named_bind_params.update(named_expanded)
+                    else:
+                        for v in reversed(expanded):
+                            line_params.insert(0, v)
                 else:
                     placeholder = f":{token.name}" if is_named else self.placeholder
                     line = line[: token.start] + placeholder + line[token.end :]
@@ -338,6 +349,60 @@ class TwoWaySQLParser:
             return None
 
         return params.get(token.name)
+
+    def _convert_operator(
+        self,
+        token: Any,
+        value: Any,
+        is_named: bool,
+    ) -> tuple[str, list[Any], dict[str, Any]]:
+        """比較演算子を値に応じて自動変換する.
+
+        変換規則:
+        - None/空リスト → IS NULL / IS NOT NULL
+        - スカラー/1要素リスト → = ? / <> ?
+        - 2要素以上のリスト → IN (?, ...) / NOT IN (?, ...)
+
+        Args:
+            token: パラメータトークン（operator属性を持つ）
+            value: パラメータ値
+            is_named: 名前付きプレースホルダを使用するか
+
+        Returns:
+            (置換文字列, バインドパラメータリスト, 名前付きパラメータ辞書) のタプル
+
+        """
+        operator = token.operator
+        is_negation = operator in ("<>", "!=")
+
+        # None または空リスト → IS NULL / IS NOT NULL
+        if value is None or (isinstance(value, list) and len(value) == 0):
+            if is_negation:
+                return "IS NOT NULL", [], {}
+            return "IS NULL", [], {}
+
+        # リストの場合
+        if isinstance(value, list):
+            if len(value) == 1:
+                # 1要素リスト → = ? / <> ?
+                op = "<>" if is_negation else "="
+                if is_named:
+                    return f"{op} :{token.name}", [], {token.name: value[0]}
+                return f"{op} {self.placeholder}", [value[0]], {}
+            # 2要素以上 → IN / NOT IN
+            not_prefix = "NOT " if is_negation else ""
+            if is_named:
+                named = {f"{token.name}_{i}": v for i, v in enumerate(value)}
+                placeholders = ", ".join(f":{k}" for k in named)
+                return f"{not_prefix}IN ({placeholders})", [], named
+            placeholders = ", ".join([self.placeholder] * len(value))
+            return f"{not_prefix}IN ({placeholders})", list(value), {}
+
+        # スカラー値 → = ? / <> ?
+        op = "<>" if is_negation else "="
+        if is_named:
+            return f"{op} :{token.name}", [], {token.name: value}
+        return f"{op} {self.placeholder}", [value], {}
 
     def _expand_in_clause(self, values: list[Any]) -> tuple[str, list[Any]]:
         """IN句のリストをプレースホルダに展開する.

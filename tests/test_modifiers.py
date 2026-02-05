@@ -425,3 +425,114 @@ UNION ALL
         parser = TwoWaySQLParser(sql)
         result = parser.parse({"name1": "Alice", "name2": None})
         assert "UNION" not in result.sql
+
+
+class TestOperatorAutoConversion:
+    """比較演算子の自動変換テスト."""
+
+    def test_equals_with_scalar(self) -> None:
+        """= 演算子とスカラー値."""
+        sql = "SELECT * FROM users WHERE name /* param */= 'default'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": "Alice"})
+        assert "name = ?" in result.sql
+        assert result.params == ["Alice"]
+
+    def test_equals_with_none(self) -> None:
+        """= 演算子と None → IS NULL."""
+        sql = "SELECT * FROM users WHERE name /* param */= 'default'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": None})
+        assert "name IS NULL" in result.sql
+        assert result.params == []
+
+    def test_equals_with_empty_list(self) -> None:
+        """= 演算子と空リスト → IS NULL."""
+        sql = "SELECT * FROM users WHERE name /* param */= 'default'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": []})
+        assert "name IS NULL" in result.sql
+        assert result.params == []
+
+    def test_equals_with_single_element_list(self) -> None:
+        """= 演算子と1要素リスト → = ?."""
+        sql = "SELECT * FROM users WHERE id /* param */= 1"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": [100]})
+        assert "id = ?" in result.sql
+        assert result.params == [100]
+
+    def test_equals_with_multi_element_list(self) -> None:
+        """= 演算子と複数要素リスト → IN (?, ?, ...)."""
+        sql = "SELECT * FROM users WHERE id /* param */= 1"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": [1, 2, 3]})
+        assert "id IN (?, ?, ?)" in result.sql
+        assert result.params == [1, 2, 3]
+
+    def test_not_equals_with_scalar(self) -> None:
+        """<> 演算子とスカラー値."""
+        sql = "SELECT * FROM users WHERE name /* param */<> 'default'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": "Alice"})
+        assert "name <> ?" in result.sql
+        assert result.params == ["Alice"]
+
+    def test_not_equals_with_none(self) -> None:
+        """<> 演算子と None → IS NOT NULL."""
+        sql = "SELECT * FROM users WHERE name /* param */<> 'default'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": None})
+        assert "name IS NOT NULL" in result.sql
+        assert result.params == []
+
+    def test_not_equals_with_list(self) -> None:
+        """<> 演算子とリスト → NOT IN (?, ?, ...)."""
+        sql = "SELECT * FROM users WHERE id /* param */<> 1"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": [1, 2, 3]})
+        assert "id NOT IN (?, ?, ?)" in result.sql
+        assert result.params == [1, 2, 3]
+
+    def test_exclamation_equals_with_none(self) -> None:
+        """!= 演算子と None → IS NOT NULL."""
+        sql = "SELECT * FROM users WHERE name /* param */!= 'default'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": None})
+        assert "name IS NOT NULL" in result.sql
+        assert result.params == []
+
+    def test_operator_tokenizer_recognizes_pattern(self) -> None:
+        """Tokenizer が比較演算子パターンを認識する."""
+        tokens = tokenize("/* param */= 'default'")
+        assert len(tokens) == 1
+        assert tokens[0].operator == "="
+        assert tokens[0].name == "param"
+
+    def test_operator_with_named_placeholder(self) -> None:
+        """名前付きプレースホルダでの比較演算子変換."""
+        sql = "SELECT * FROM users WHERE id /* param */= 1"
+        parser = TwoWaySQLParser(sql, placeholder=":name")
+        result = parser.parse({"param": [1, 2, 3]})
+        assert "id IN (:param_0, :param_1, :param_2)" in result.sql
+        assert result.named_params == {"param_0": 1, "param_1": 2, "param_2": 3}
+
+    def test_operator_with_removable_modifier(self) -> None:
+        """$ 修飾子付き比較演算子."""
+        sql = """\
+SELECT * FROM users
+WHERE
+    id = /* id */1
+    AND name /* $param */= 'default'"""
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"id": 1, "param": None})
+        # $ 付きで None なので行削除
+        assert "name" not in result.sql
+        assert result.params == [1]
+
+    def test_operator_without_removable_none_converts(self) -> None:
+        """$ なしで None → IS NULL（行削除なし）."""
+        sql = "SELECT * FROM users WHERE name /* param */= 'default'"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": None})
+        assert "name IS NULL" in result.sql
