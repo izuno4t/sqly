@@ -19,11 +19,13 @@ Tokyo
 Japan'
 )"""
         parser = TwoWaySQLParser(sql)
-        result = parser.parse({
-            "id": "0002",
-            "name": "John",
-            "address": "123 Main St\nNew York\nUSA",
-        })
+        result = parser.parse(
+            {
+                "id": "0002",
+                "name": "John",
+                "address": "123 Main St\nNew York\nUSA",
+            }
+        )
         assert "?" in result.sql
         assert result.params == ["0002", "John", "123 Main St\nNew York\nUSA"]
 
@@ -40,11 +42,13 @@ Tokyo
 Japan'
 )"""
         parser = TwoWaySQLParser(sql)
-        result = parser.parse({
-            "id": "0002",
-            "name": None,
-            "address": None,
-        })
+        result = parser.parse(
+            {
+                "id": "0002",
+                "name": None,
+                "address": None,
+            }
+        )
         # name と address が削除される
         assert "name" not in result.sql.lower() or "/* $name */" not in result.sql
         assert result.params == ["0002"]

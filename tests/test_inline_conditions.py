@@ -36,10 +36,7 @@ class TestParseInlineConditions:
 
     def test_multiple_inline_conditions(self) -> None:
         """複数のインライン条件分岐."""
-        line = (
-            "SELECT /*%if a */ x /*%else */ y /*%end*/, "
-            "/*%if b */ m /*%else */ n /*%end*/"
-        )
+        line = "SELECT /*%if a */ x /*%else */ y /*%end*/, /*%if b */ m /*%else */ n /*%end*/"
         conditions = parse_inline_conditions(line)
         assert len(conditions) == 2
 

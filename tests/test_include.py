@@ -72,9 +72,7 @@ class TestIncludeExpansion:
             base_path = Path(tmpdir)
             # ネストされたインクルードファイルを作成
             (base_path / "inner.sql").write_text("name = /* name */'default'")
-            (base_path / "outer.sql").write_text(
-                'id = /* id */1 AND /* %include "inner.sql" */'
-            )
+            (base_path / "outer.sql").write_text('id = /* id */1 AND /* %include "inner.sql" */')
 
             sql = 'SELECT * FROM users WHERE /* %include "outer.sql" */'
             parser = TwoWaySQLParser(sql, base_path=base_path)

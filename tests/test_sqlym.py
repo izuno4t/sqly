@@ -315,9 +315,7 @@ class TestSqlymWithContextManager:
         """正常終了時は commit される."""
         sql_dir = tmp_path / "sql"
         sql_dir.mkdir()
-        (sql_dir / "insert.sql").write_text(
-            "INSERT INTO users VALUES (/* id */0, /* name */'')"
-        )
+        (sql_dir / "insert.sql").write_text("INSERT INTO users VALUES (/* id */0, /* name */'')")
 
         conn = sqlite3.connect(":memory:")
         conn.execute("CREATE TABLE users (id INTEGER, name TEXT)")
@@ -334,9 +332,7 @@ class TestSqlymWithContextManager:
         """例外発生時は rollback される."""
         sql_dir = tmp_path / "sql"
         sql_dir.mkdir()
-        (sql_dir / "insert.sql").write_text(
-            "INSERT INTO users VALUES (/* id */0, /* name */'')"
-        )
+        (sql_dir / "insert.sql").write_text("INSERT INTO users VALUES (/* id */0, /* name */'')")
 
         conn = sqlite3.connect(":memory:")
         conn.execute("CREATE TABLE users (id INTEGER, name TEXT)")

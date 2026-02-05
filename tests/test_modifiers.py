@@ -225,9 +225,7 @@ VALUES (
         result = parser.parse({"id": 1, "name": "Alice", "email": None})
         # email 行が削除され、name 行末のカンマが除去される
         lines = result.sql.split("\n")
-        name_line = [
-            line for line in lines if "?" in line and "," not in line.split("?")[-1]
-        ]
+        name_line = [line for line in lines if "?" in line and "," not in line.split("?")[-1]]
         assert len(name_line) >= 1  # カンマが除去された行がある
 
     def test_multiple_trailing_and_removed(self) -> None:

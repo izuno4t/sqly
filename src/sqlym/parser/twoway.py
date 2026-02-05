@@ -156,9 +156,7 @@ class TwoWaySQLParser:
 
                 # ディレクティブを展開後の SQL で置換
                 processed_line = (
-                    processed_line[: include.start]
-                    + expanded_sql
-                    + processed_line[include.end :]
+                    processed_line[: include.start] + expanded_sql + processed_line[include.end :]
                 )
 
             result_lines.append(processed_line)
@@ -303,9 +301,7 @@ class TwoWaySQLParser:
 
             if directive.type == DirectiveType.IF:
                 # %IF ブロックを処理
-                end_idx, selected_units = self._process_if_block(
-                    units, i, params
-                )
+                end_idx, selected_units = self._process_if_block(units, i, params)
                 result.extend(selected_units)
                 i = end_idx + 1
             elif directive.type in (
@@ -487,12 +483,10 @@ class TwoWaySQLParser:
                 depth -= 1
                 current += ch
                 i += 1
-            elif depth == 0 and expr[i:i + op_len].upper() == op_upper:
+            elif depth == 0 and expr[i : i + op_len].upper() == op_upper:
                 # 演算子の前後がスペースまたは文字列の端であることを確認
                 before_ok = i == 0 or expr[i - 1].isspace()
-                after_ok = (
-                    i + op_len >= len(expr) or expr[i + op_len].isspace()
-                )
+                after_ok = i + op_len >= len(expr) or expr[i + op_len].isspace()
                 if before_ok and after_ok:
                     parts.append(current)
                     current = ""
@@ -727,7 +721,7 @@ class TwoWaySQLParser:
                     # 列式を含めて置換
                     col_start = token.start - len(col_expr) - 1  # スペース分
                     # 列式の開始位置を正確に計算
-                    prefix = line[:token.start].rstrip()
+                    prefix = line[: token.start].rstrip()
                     col_start = len(prefix) - len(col_expr)
                     line = line[:col_start] + replacement + line[token.end :]
                     if is_named:
@@ -752,9 +746,7 @@ class TwoWaySQLParser:
                             line_params.insert(0, v)
                 elif token.helper_func:
                     # 補助関数の処理
-                    replacement, expanded_value = self._process_helper_func(
-                        token, params, is_named
-                    )
+                    replacement, expanded_value = self._process_helper_func(token, params, is_named)
                     if token.helper_func in ("STR", "SQL"):
                         # 直接埋め込み（プレースホルダなし）
                         line = line[: token.start] + replacement + line[token.end :]
@@ -938,9 +930,7 @@ class TwoWaySQLParser:
         parts = [f"{col_expr} {like_kw} {self.placeholder}" for _ in value]
         return f"({joiner.join(parts)})", list(value), {}
 
-    def _process_inline_conditions(
-        self, line: str, params: dict[str, Any]
-    ) -> str:
+    def _process_inline_conditions(self, line: str, params: dict[str, Any]) -> str:
         """インライン条件分岐を処理する.
 
         構文: /*%if cond1 */ val1 /*%elseif cond2 */ val2 /*%else */ val3 /*%end*/
