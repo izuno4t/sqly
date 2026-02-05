@@ -536,3 +536,78 @@ WHERE
         parser = TwoWaySQLParser(sql)
         result = parser.parse({"param": None})
         assert "name IS NULL" in result.sql
+
+
+class TestPartialInExpansion:
+    """IN 句の部分展開（固定値 + パラメータ混在）テスト."""
+
+    def test_partial_in_with_list(self) -> None:
+        """IN 句内の部分パラメータをリストで展開."""
+        sql = "SELECT * FROM users WHERE status IN ('a', 'b', /* param */'c')"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": [10, 20, 30]})
+        assert "IN ('a', 'b', ?, ?, ?)" in result.sql
+        assert result.params == [10, 20, 30]
+
+    def test_partial_in_with_scalar(self) -> None:
+        """IN 句内の部分パラメータをスカラー値で置換."""
+        sql = "SELECT * FROM users WHERE status IN ('a', 'b', /* param */'c')"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": "active"})
+        assert "IN ('a', 'b', ?)" in result.sql
+        assert result.params == ["active"]
+
+    def test_partial_in_with_empty_list(self) -> None:
+        """IN 句内の部分パラメータに空リスト → NULL."""
+        sql = "SELECT * FROM users WHERE status IN ('a', 'b', /* param */'c')"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": []})
+        assert "IN ('a', 'b', NULL)" in result.sql
+        assert result.params == []
+
+    def test_partial_in_at_start(self) -> None:
+        """IN 句の先頭に固定値がある場合の部分展開."""
+        sql = "SELECT * FROM t WHERE id IN (1, /* param */2)"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"param": [3, 4, 5]})
+        assert "IN (1, ?, ?, ?)" in result.sql
+        assert result.params == [3, 4, 5]
+
+    def test_partial_in_named_placeholder(self) -> None:
+        """名前付きプレースホルダでの部分 IN 展開."""
+        sql = "SELECT * FROM users WHERE status IN ('a', /* param */'b')"
+        parser = TwoWaySQLParser(sql, placeholder=":name")
+        result = parser.parse({"param": [10, 20]})
+        assert "IN ('a', :param_0, :param_1)" in result.sql
+        assert result.named_params == {"param_0": 10, "param_1": 20}
+
+    def test_partial_in_tokenizer_detects(self) -> None:
+        """Tokenizer が部分 IN パラメータを検出する."""
+        tokens = tokenize("IN ('a', 'b', /* param */'c')")
+        assert len(tokens) == 1
+        assert tokens[0].is_partial_in is True
+        assert tokens[0].name == "param"
+
+    def test_full_in_not_partial(self) -> None:
+        """完全な IN 句パラメータは部分展開ではない."""
+        tokens = tokenize("IN /* param */('a', 'b', 'c')")
+        assert len(tokens) == 1
+        assert tokens[0].is_in_clause is True
+        assert tokens[0].is_partial_in is False
+
+    def test_partial_in_with_multiple_params(self) -> None:
+        """IN 句内に複数のパラメータがある場合."""
+        sql = "SELECT * FROM t WHERE id IN (/* p1 */1, /* p2 */2)"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"p1": [10, 20], "p2": [30]})
+        assert "IN (?, ?, ?)" in result.sql
+        assert result.params == [10, 20, 30]
+
+    def test_partial_in_preserves_fixed_values(self) -> None:
+        """固定値は保持される."""
+        sql = "SELECT * FROM t WHERE code IN ('X', 'Y', /* codes */'Z')"
+        parser = TwoWaySQLParser(sql)
+        result = parser.parse({"codes": ["A", "B"]})
+        assert "'X'" in result.sql
+        assert "'Y'" in result.sql
+        assert result.params == ["A", "B"]

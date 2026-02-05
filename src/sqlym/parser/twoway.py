@@ -306,6 +306,21 @@ class TwoWaySQLParser:
                     else:
                         for v in reversed(expanded):
                             line_params.insert(0, v)
+                elif token.is_partial_in and isinstance(value, list):
+                    # IN 句の部分展開（固定値 + パラメータ混在）
+                    if not value:
+                        # 空リスト → NULL
+                        line = line[: token.start] + "NULL" + line[token.end :]
+                    elif is_named:
+                        named = {f"{token.name}_{i}": v for i, v in enumerate(value)}
+                        placeholders = ", ".join(f":{k}" for k in named)
+                        line = line[: token.start] + placeholders + line[token.end :]
+                        named_bind_params.update(named)
+                    else:
+                        placeholders = ", ".join([self.placeholder] * len(value))
+                        line = line[: token.start] + placeholders + line[token.end :]
+                        for v in reversed(value):
+                            line_params.insert(0, v)
                 else:
                     placeholder = f":{token.name}" if is_named else self.placeholder
                     line = line[: token.start] + placeholder + line[token.end :]

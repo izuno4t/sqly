@@ -111,6 +111,9 @@ class Token:
     operator: str | None = None
     """比較演算子（=, <>, != など）。自動変換対象の場合に設定."""
 
+    is_partial_in: bool = False
+    """IN句内の部分パラメータか（固定値 + パラメータ混在）."""
+
 
 def _parse_modifiers(modifiers: str | None) -> dict[str, bool]:
     """修飾記号文字列をパースしてフラグ辞書を返す."""
@@ -231,6 +234,8 @@ def tokenize(line: str) -> list[Token]:
         name = m.group(2)
         default = m.group(3) or ""
         flags = _parse_modifiers(modifiers)
+        # IN 句内の部分パラメータか判定
+        is_partial = _is_inside_in_clause(line, m.start(), m.end())
         tokens.append(
             Token(
                 name=name,
@@ -243,6 +248,7 @@ def tokenize(line: str) -> list[Token]:
                 negated=flags["negated"],
                 required=flags["required"],
                 fallback=flags["fallback"],
+                is_partial_in=is_partial,
             )
         )
 
@@ -253,6 +259,56 @@ def tokenize(line: str) -> list[Token]:
 def _overlaps(start: int, end: int, ranges: list[tuple[int, int]]) -> bool:
     """指定範囲が既存範囲と重複するか判定する."""
     return any(start < r_end and end > r_start for r_start, r_end in ranges)
+
+
+def _is_inside_in_clause(line: str, start: int, end: int) -> bool:
+    """パラメータが IN 句の括弧内にあるか判定する.
+
+    IN ('a', 'b', /* param */'c') のような場合に True を返す。
+    IN (/* p1 */1, /* p2 */2) のような複数パラメータも True。
+    IN /* param */(...) のような完全な IN 句パラメータは False（IN_PATTERN で処理）。
+
+    Args:
+        line: SQL行文字列
+        start: パラメータの開始位置
+        end: パラメータの終了位置
+
+    Returns:
+        IN 句内の部分パラメータなら True
+
+    """
+    prefix = line[:start]
+
+    # prefix の末尾から開き括弧を探す（括弧のネストを考慮）
+    # IN ( の後にいるかどうかを判定
+    paren_depth = 0
+    in_found = False
+    i = len(prefix) - 1
+
+    while i >= 0:
+        ch = prefix[i]
+        if ch == ")":
+            paren_depth += 1
+        elif ch == "(":
+            if paren_depth > 0:
+                paren_depth -= 1
+            else:
+                # 対応する開き括弧を見つけた
+                # この前に IN があるか確認
+                before_paren = prefix[:i].rstrip()
+                if re.search(r"\bIN\s*$", before_paren, re.IGNORECASE):
+                    in_found = True
+                break
+        i -= 1
+
+    if not in_found:
+        return False
+
+    # パラメータの後に ) があるか確認（カンマ区切りの値があっても可）
+    suffix = line[end:]
+    # 閉じ括弧まで到達できるか
+    close_match = re.search(r"\)", suffix)
+    return close_match is not None
 
 
 def _extract_in_default(matched: str) -> str:
