@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import is_dataclass
 from typing import Any
 
-from sqly.mapper.manual import ManualMapper
-from sqly.mapper.protocol import RowMapper
+from sqlym.mapper.manual import ManualMapper
+from sqlym.mapper.protocol import RowMapper
 
 
 def create_mapper(
@@ -34,12 +34,12 @@ def create_mapper(
             return ManualMapper(mapper)
 
     if is_dataclass(entity_cls):
-        from sqly.mapper.dataclass import DataclassMapper
+        from sqlym.mapper.dataclass import DataclassMapper
 
         return DataclassMapper(entity_cls)
 
     if hasattr(entity_cls, "model_validate"):
-        from sqly.mapper.pydantic import PydanticMapper
+        from sqlym.mapper.pydantic import PydanticMapper
 
         return PydanticMapper(entity_cls)
 

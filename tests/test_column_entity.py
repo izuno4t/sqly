@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated
 
-from sqly.mapper.column import Column, entity
+from sqlym.mapper.column import Column, entity
 
 
 class TestColumn:

@@ -7,9 +7,9 @@ from typing import Annotated
 
 import pytest
 
-from sqly.mapper.column import Column, entity
-from sqly.mapper.dataclass import DataclassMapper
-from sqly.mapper.protocol import RowMapper
+from sqlym.mapper.column import Column, entity
+from sqlym.mapper.dataclass import DataclassMapper
+from sqlym.mapper.protocol import RowMapper
 
 
 @dataclass

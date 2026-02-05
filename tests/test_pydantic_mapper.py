@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from sqly.mapper.protocol import RowMapper
+from sqlym.mapper.protocol import RowMapper
 
 pydantic = pytest.importorskip("pydantic")
 
 from pydantic import BaseModel  # noqa: E402
 
-from sqly.mapper.pydantic import PydanticMapper  # noqa: E402
+from sqlym.mapper.pydantic import PydanticMapper  # noqa: E402
 
 
 class User(BaseModel):

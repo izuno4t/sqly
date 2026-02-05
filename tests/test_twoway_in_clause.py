@@ -2,9 +2,9 @@
 
 import pytest
 
-from sqly.dialect import Dialect
-from sqly.exceptions import SqlParseError
-from sqly.parser.twoway import TwoWaySQLParser
+from sqlym.dialect import Dialect
+from sqlym.exceptions import SqlParseError
+from sqlym.parser.twoway import TwoWaySQLParser
 
 
 class TestInClauseBasic:
@@ -218,7 +218,7 @@ class TestInClauseSplit:
 
     def test_split_error_includes_sql_when_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """設定が有効ならSQL断片を含める."""
-        from sqly import config
+        from sqlym import config
 
         monkeypatch.setattr(config, "ERROR_INCLUDE_SQL", True)
         sql = "SELECT * FROM t WHERE id + 1 IN /* $ids */(1)"
@@ -229,7 +229,7 @@ class TestInClauseSplit:
 
     def test_split_error_excludes_sql_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """設定が無効ならSQL断片を含めない."""
-        from sqly import config
+        from sqlym import config
 
         monkeypatch.setattr(config, "ERROR_INCLUDE_SQL", False)
         sql = "SELECT * FROM t WHERE id + 1 IN /* $ids */(1)"
@@ -242,7 +242,7 @@ class TestInClauseSplit:
 
     def test_split_error_language_english(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """英語メッセージに切り替えられる."""
-        from sqly import config
+        from sqlym import config
 
         monkeypatch.setattr(config, "ERROR_MESSAGE_LANGUAGE", "en")
         sql = "SELECT * FROM t WHERE id + 1 IN /* $ids */(1)"

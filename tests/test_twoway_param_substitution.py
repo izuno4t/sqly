@@ -1,6 +1,6 @@
 """TwoWaySQLParser の基本パラメータ置換テスト."""
 
-from sqly.parser.twoway import TwoWaySQLParser
+from sqlym.parser.twoway import TwoWaySQLParser
 
 
 class TestBasicParamSubstitution:

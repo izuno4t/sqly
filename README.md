@@ -1,4 +1,10 @@
-# sqly
+# sqlym
+
+[![PyPI version](https://img.shields.io/pypi/v/sqlym.svg)](https://pypi.org/project/sqlym/)
+[![Python versions](https://img.shields.io/pypi/pyversions/sqlym.svg)](https://pypi.org/project/sqlym/)
+[![License](https://img.shields.io/pypi/l/sqlym.svg)](https://github.com/izuno4t/sqly/blob/main/LICENSE)
+[![CI](https://github.com/izuno4t/sqly/actions/workflows/ci.yml/badge.svg)](https://github.com/izuno4t/sqly/actions/workflows/ci.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 [日本語](README.ja.md)
 
@@ -7,7 +13,7 @@ A SQL template engine for Python. Inspired by Java's
 [Doma2](https://github.com/domaframework/doma), it provides a 2-way SQL parser
 and row-to-object mapping.
 
-- **SQL-first** — Write SQL directly, not through an ORM. sqly never
+- **SQL-first** — Write SQL directly, not through an ORM. sqlym never
   auto-generates SQL
 - **2-way SQL** — SQL files remain directly executable by DB tools
 - **Zero dependencies** — Core runs on the Python standard library only
@@ -18,7 +24,7 @@ and row-to-object mapping.
 ## Quick Start
 
 ```bash
-pip install sqly
+pip install sqlym
 ```
 
 ### 1. Define an Entity
@@ -26,7 +32,7 @@ pip install sqly
 ```python
 from dataclasses import dataclass
 from typing import Annotated
-from sqly import Column
+from sqlym import Column
 
 @dataclass
 class Employee:
@@ -55,7 +61,7 @@ WHERE
 ### 3. Execute
 
 ```python
-from sqly import SqlExecutor, create_mapper
+from sqlym import SqlExecutor, create_mapper
 
 executor = SqlExecutor(connection)
 mapper = create_mapper(Employee)
@@ -121,7 +127,7 @@ If you want to hide the SQL snippet from error messages, disable it via
 config:
 
 ```python
-from sqly import config
+from sqlym import config
 
 config.ERROR_INCLUDE_SQL = False
 config.ERROR_MESSAGE_LANGUAGE = "en"
@@ -147,7 +153,7 @@ mapper = create_mapper(Employee, mapper=lambda row: Employee(
 
 ```python
 from typing import Annotated
-from sqly import Column, entity
+from sqlym import Column, entity
 
 @dataclass
 class Employee:
@@ -172,22 +178,22 @@ Supports SQLite, PostgreSQL, MySQL, and Oracle.
 | RDBMS | Driver | Placeholder | Extras |
 | --- | --- | --- | --- |
 | SQLite | [sqlite3](https://docs.python.org/3/library/sqlite3.html) (stdlib) | `?` | — |
-| PostgreSQL | [psycopg](https://www.psycopg.org/) 3.1+ | `%s` | `sqly[postgresql]` |
-| MySQL | [PyMySQL](https://pymysql.readthedocs.io/) 1.1+ | `%s` | `sqly[mysql]` |
-| Oracle | [python-oracledb](https://python-oracledb.readthedocs.io/) 3.0+ | `:name` | `sqly[oracle]` |
+| PostgreSQL | [psycopg](https://www.psycopg.org/) 3.1+ | `%s` | `sqlym[postgresql]` |
+| MySQL | [PyMySQL](https://pymysql.readthedocs.io/) 1.1+ | `%s` | `sqlym[mysql]` |
+| Oracle | [python-oracledb](https://python-oracledb.readthedocs.io/) 3.0+ | `:name` | `sqlym[oracle]` |
 
 For RDBMS other than SQLite, install with extras. The driver will be installed
 automatically.
 
 ```bash
-pip install sqly[postgresql]
+pip install sqlym[postgresql]
 ```
 
 | Feature | Description |
 | --- | --- |
 | LIKE escaping | Handles LIKE escape differences across databases |
 | IN clause limit | Splits when exceeding Oracle's 1000-element limit |
-| RDBMS-specific SQL file loading | Fallback: `find.sql-oracle` → `find.sql` |
+| RDBMS-specific SQL file loading | Fallback: `find.oracle.sql` → `find.sql` |
 
 When SQL syntax differs across databases, you can provide database-specific SQL
 files:
@@ -195,13 +201,13 @@ files:
 ```text
 sql/employee/
 ├── find.sql              # Common SQL
-├── find.sql-oracle       # Oracle-specific (loaded preferentially)
-└── find.sql-postgresql   # PostgreSQL-specific (loaded preferentially)
+├── find.oracle.sql       # Oracle-specific (loaded preferentially)
+└── find.postgresql.sql   # PostgreSQL-specific (loaded preferentially)
 ```
 
-## What sqly Does Not Provide
+## What sqlym Does Not Provide
 
-sqly is a SQL template engine. The following features are out of scope.
+sqlym is a SQL template engine. The following features are out of scope.
 Write SQL directly or combine with other libraries.
 
 - SQL generation (INSERT/UPDATE/DELETE/UPSERT, etc.)
@@ -212,7 +218,7 @@ Write SQL directly or combine with other libraries.
 
 ## Acknowledgments
 
-sqly's 2-way SQL parser is based on the design of
+sqlym's 2-way SQL parser is based on the design of
 [Clione-SQL](https://github.com/tauty/clione-sql) by tauty. The four rules for
 line-based SQL processing, indent-driven parent-child relationships, and
 parameter comment syntax all originate from Clione-SQL.

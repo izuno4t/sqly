@@ -1,6 +1,6 @@
 """TwoWaySQLParser の行削除ロジック（Rule 3, Rule 4）テスト."""
 
-from sqly.parser.twoway import TwoWaySQLParser
+from sqlym.parser.twoway import TwoWaySQLParser
 
 
 class TestRule4Basic:

@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sqly.exceptions import SqlFileNotFoundError
+from sqlym.exceptions import SqlFileNotFoundError
 
 if TYPE_CHECKING:
-    from sqly.dialect import Dialect
+    from sqlym.dialect import Dialect
 
 
 class SqlLoader:

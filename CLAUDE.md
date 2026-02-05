@@ -14,7 +14,7 @@ sqly is a SQL-first database access library for Python, inspired by Java's Clion
 ## Architecture
 
 ```
-src/sqly/
+src/sqlym/
 ├── __init__.py          # Public API (parse_sql, create_mapper, Column, entity, etc.)
 ├── _parse.py            # parse_sql convenience function
 ├── config.py            # Error message settings

@@ -2,7 +2,7 @@
 
 import pytest
 
-from sqly.exceptions import MappingError, SqlFileNotFoundError, SqlParseError, SqlyError
+from sqlym.exceptions import MappingError, SqlFileNotFoundError, SqlParseError, SqlyError
 
 
 class TestExceptionHierarchy:

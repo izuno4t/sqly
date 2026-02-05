@@ -1,6 +1,6 @@
 """LineUnitクラスのテスト."""
 
-from sqly.parser.line_unit import LineUnit
+from sqlym.parser.line_unit import LineUnit
 
 
 class TestLineUnitCreation:

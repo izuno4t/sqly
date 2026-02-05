@@ -2,8 +2,8 @@
 
 import pytest
 
-from sqly import Dialect, parse_sql
-from sqly.parser.twoway import TwoWaySQLParser
+from sqlym import Dialect, parse_sql
+from sqlym.parser.twoway import TwoWaySQLParser
 
 
 class TestPercentSBasic:

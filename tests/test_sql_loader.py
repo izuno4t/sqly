@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from sqly import Dialect
-from sqly.exceptions import SqlFileNotFoundError
-from sqly.loader import SqlLoader
+from sqlym import Dialect
+from sqlym.exceptions import SqlFileNotFoundError
+from sqlym.loader import SqlLoader
 
 
 @pytest.fixture
@@ -130,18 +130,14 @@ def dialect_sql_dir(tmp_path: Path) -> Path:
         "SELECT * FROM t WHERE ROWNUM <= 10", encoding="utf-8"
     )
     # PostgreSQL 固有
-    (tmp_path / "find.postgresql.sql").write_text(
-        "SELECT * FROM t LIMIT 10", encoding="utf-8"
-    )
+    (tmp_path / "find.postgresql.sql").write_text("SELECT * FROM t LIMIT 10", encoding="utf-8")
     # 汎用のみ（dialect固有なし）
     (tmp_path / "common.sql").write_text("SELECT 1", encoding="utf-8")
     # サブディレクトリ
     sub_dir = tmp_path / "employee"
     sub_dir.mkdir()
     (sub_dir / "find.sql").write_text("SELECT * FROM employees", encoding="utf-8")
-    (sub_dir / "find.mysql.sql").write_text(
-        "SELECT * FROM employees LIMIT 10", encoding="utf-8"
-    )
+    (sub_dir / "find.mysql.sql").write_text("SELECT * FROM employees LIMIT 10", encoding="utf-8")
     return tmp_path
 
 

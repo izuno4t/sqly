@@ -1,6 +1,6 @@
 """TwoWaySQLParser._parse_lines() と _build_tree() のテスト."""
 
-from sqly.parser.twoway import TwoWaySQLParser
+from sqlym.parser.twoway import TwoWaySQLParser
 
 
 class TestParseLines:

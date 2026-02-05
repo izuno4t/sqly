@@ -6,13 +6,13 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from sqly import config
-from sqly.exceptions import SqlParseError
-from sqly.parser.line_unit import LineUnit
-from sqly.parser.tokenizer import tokenize
+from sqlym import config
+from sqlym.exceptions import SqlParseError
+from sqlym.parser.line_unit import LineUnit
+from sqlym.parser.tokenizer import tokenize
 
 if TYPE_CHECKING:
-    from sqly.dialect import Dialect
+    from sqlym.dialect import Dialect
 
 
 @dataclass

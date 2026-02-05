@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sqly.parser.twoway import ParsedSQL, TwoWaySQLParser
+from sqlym.parser.twoway import ParsedSQL, TwoWaySQLParser
 
 if TYPE_CHECKING:
-    from sqly.dialect import Dialect
+    from sqlym.dialect import Dialect
 
 
 def parse_sql(

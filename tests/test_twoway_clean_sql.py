@@ -1,6 +1,6 @@
 """TwoWaySQLParser._clean_sql() のテスト（WHERE/AND/OR/空括弧除去）."""
 
-from sqly.parser.twoway import TwoWaySQLParser
+from sqlym.parser.twoway import TwoWaySQLParser
 
 
 def _clean(sql: str) -> str:

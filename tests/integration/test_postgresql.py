@@ -8,8 +8,8 @@ from typing import Annotated, Any
 
 import pytest
 
-from sqly import Column, Dialect, ParsedSQL, SqlLoader, create_mapper, escape_like, parse_sql
-from sqly.mapper.column import entity
+from sqlym import Column, Dialect, ParsedSQL, SqlLoader, create_mapper, escape_like, parse_sql
+from sqlym.mapper.column import entity
 
 pytestmark = pytest.mark.postgresql
 

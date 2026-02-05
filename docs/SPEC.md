@@ -1,4 +1,4 @@
-# sqly 機能仕様書
+# sqlym 機能仕様書
 
 ## 1. 概要
 
@@ -170,7 +170,7 @@ SQL実行結果（行）をPythonオブジェクトに変換する機能。
 dataclassまたはPydantic BaseModelを自動的にマッピングする。
 
 ```python
-from sqly import create_mapper
+from sqlym import create_mapper
 
 mapper = create_mapper(Employee)  # 自動判定
 ```
@@ -226,7 +226,7 @@ class RowMapper(Protocol[T]):
 
 ```python
 from typing import Annotated
-from sqly import Column
+from sqlym import Column
 
 @dataclass
 class Employee:
@@ -238,7 +238,7 @@ class Employee:
 ### 4.2 一括指定（デコレータ）
 
 ```python
-from sqly import entity
+from sqlym import entity
 
 @entity(column_map={
     "id": "EMP_ID",

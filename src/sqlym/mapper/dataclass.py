@@ -6,7 +6,7 @@ import re
 from dataclasses import fields, is_dataclass
 from typing import Annotated, Any, ClassVar, get_args, get_origin, get_type_hints
 
-from sqly.mapper.column import Column
+from sqlym.mapper.column import Column
 
 
 class DataclassMapper:

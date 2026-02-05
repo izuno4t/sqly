@@ -64,7 +64,7 @@
 
 ### TASK-001
 
-- 補足: pyproject.toml、sqly/各サブパッケージの__init__.py、tests/ディレクトリを作成する
+- 補足: pyproject.toml、sqlym/各サブパッケージの__init__.py、tests/ディレクトリを作成する
 - 注意: 外部依存なし。Pydanticはオプション依存（extras）として定義する
 
 ### TASK-004
@@ -114,7 +114,7 @@
 
 ### TASK-019
 
-- 補足: Dialect enum (SQLITE/POSTGRESQL/MYSQL/ORACLE) を `src/sqly/dialect.py` に実装
+- 補足: Dialect enum (SQLITE/POSTGRESQL/MYSQL/ORACLE) を `src/sqlym/dialect.py` に実装
 - 注意: POSTGRESQLとMYSQLは同じプレースホルダ `%s` だが、Enumエイリアスを回避するためvalueをタプル `(dialect_id, placeholder)` とした
 
 ### TASK-020
@@ -190,7 +190,7 @@
 ### TASK-034
 
 - 補足: LIKE用パラメータのエスケープ処理を実装する
-  - ユーティリティ関数 `escape_like(value, dialect)` として実装（`src/sqly/escape_utils.py`）
+  - ユーティリティ関数 `escape_like(value, dialect)` として実装（`src/sqlym/escape_utils.py`）
   - エスケープ対象文字は `Dialect.like_escape_chars` から取得
   - `Dialect.like_escape_char` プロパティを追加（デフォルト: `#`）
   - 自動検出機能は BACKLOG-009 として将来対応

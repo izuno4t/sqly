@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqly import Dialect, escape_like
+from sqlym import Dialect, escape_like
 
 
 class TestDialect:

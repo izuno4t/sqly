@@ -1,6 +1,6 @@
 """Tokenizerのテスト."""
 
-from sqly.parser.tokenizer import Token, tokenize
+from sqlym.parser.tokenizer import Token, tokenize
 
 
 class TestTokenizeRemovableParam:

@@ -1,9 +1,9 @@
-# sqly 実装案（設計案）
+# sqlym 実装案（設計案）
 
 ## 1. パッケージ構成
 
 ```
-sqly/
+sqlym/
 ├── __init__.py          # 公開API
 ├── _parse.py            # parse_sql便利関数
 ├── config.py            # エラーメッセージ設定
@@ -33,7 +33,7 @@ sqly/
 ### 2.1 LineUnit（行単位）
 
 ```python
-# sqly/parser/line_unit.py
+# sqlym/parser/line_unit.py
 
 from dataclasses import dataclass, field
 
@@ -58,7 +58,7 @@ class LineUnit:
 ### 2.2 TwoWaySQLParser
 
 ```python
-# sqly/parser/twoway.py
+# sqlym/parser/twoway.py
 
 import re
 from dataclasses import dataclass
@@ -159,7 +159,7 @@ class TwoWaySQLParser:
 ### 2.3 RowMapper Protocol
 
 ```python
-# sqly/mapper/protocol.py
+# sqlym/mapper/protocol.py
 
 from typing import Protocol, TypeVar, Any, runtime_checkable
 
@@ -181,7 +181,7 @@ class RowMapper(Protocol[T]):
 ### 2.4 DataclassMapper
 
 ```python
-# sqly/mapper/dataclass.py
+# sqlym/mapper/dataclass.py
 
 from dataclasses import fields, is_dataclass
 from typing import TypeVar, Type, Any, get_type_hints, get_origin, get_args, Annotated
@@ -279,7 +279,7 @@ class DataclassMapper:
 ### 2.5 Column & entity デコレータ
 
 ```python
-# sqly/mapper/column.py
+# sqlym/mapper/column.py
 
 class Column:
     """カラム名を指定するアノテーション"""
@@ -317,7 +317,7 @@ def entity(
 ### 2.6 create_mapper ファクトリ
 
 ```python
-# sqly/mapper/__init__.py
+# sqlym/mapper/__init__.py
 
 from typing import TypeVar, Type, Callable, Any
 from dataclasses import is_dataclass
@@ -380,7 +380,7 @@ def create_mapper(
 ### 2.7 SQLファイルローダー
 
 ```python
-# sqly/loader.py
+# sqlym/loader.py
 
 from pathlib import Path
 
@@ -403,7 +403,7 @@ class SqlLoader:
 ### 2.8 例外クラス
 
 ```python
-# sqly/exceptions.py
+# sqlym/exceptions.py
 
 class SqlyError(Exception):
     """sqlyの基底例外"""
@@ -427,7 +427,7 @@ class SqlFileNotFoundError(SqlyError):
 ## 3. 公開API
 
 ```python
-# sqly/__init__.py
+# sqlym/__init__.py
 
 from .parser.twoway import TwoWaySQLParser, ParsedSQL, parse_sql
 from .mapper import create_mapper, RowMapper, ManualMapper
@@ -479,7 +479,7 @@ from dataclasses import dataclass
 from typing import Annotated
 import sqlite3
 
-from sqly import parse_sql, create_mapper, Column, SqlLoader
+from sqlym import parse_sql, create_mapper, Column, SqlLoader
 
 # エンティティ定義
 @dataclass
@@ -600,7 +600,7 @@ sqly はこれらの SQL 生成機能を持たないため、Doma2 相当の Dia
 既存の `Dialect` enum を拡張し、DB 固有プロパティをメソッドとして追加する。
 
 ```python
-# sqly/dialect.py
+# sqlym/dialect.py
 
 from __future__ import annotations
 
@@ -686,7 +686,7 @@ SELECT * FROM t WHERE (id IN (:ids_1, :ids_2, ..., :ids_1000)
 LIKE パラメータのエスケープ処理をユーティリティ関数として提供する。
 
 ```python
-from sqly import Dialect
+from sqlym import Dialect
 
 # Dialect に応じたエスケープ処理
 def escape_like(value: str, dialect: Dialect, escape_char: str = "#") -> str:

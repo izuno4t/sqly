@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sqly"
+name = "sqlym"
 version = "0.1.0"
 description = "SQL-first database access library for Python"
 readme = "README.md"
@@ -50,7 +50,7 @@ markers = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/sqly"]
+packages = ["src/sqlym"]
 
 [tool.ruff]
 line-length = 100

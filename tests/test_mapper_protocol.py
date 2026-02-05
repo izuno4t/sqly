@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sqly.mapper.protocol import RowMapper
+from sqlym.mapper.protocol import RowMapper
 
 
 @dataclass
@@ -88,7 +88,7 @@ class TestManualMapper:
 
     def test_map_row_with_function(self) -> None:
         """関数を渡して map_row が動作する."""
-        from sqly.mapper import ManualMapper
+        from sqlym.mapper import ManualMapper
 
         def to_user(row: dict[str, Any]) -> User:
             return User(id=row["id"], name=row["name"])
@@ -99,7 +99,7 @@ class TestManualMapper:
 
     def test_map_row_with_lambda(self) -> None:
         """Lambda を渡して map_row が動作する."""
-        from sqly.mapper import ManualMapper
+        from sqlym.mapper import ManualMapper
 
         mapper = ManualMapper(lambda row: User(id=row["id"], name=row["name"]))
         user = mapper.map_row({"id": 1, "name": "Alice"})
@@ -107,7 +107,7 @@ class TestManualMapper:
 
     def test_map_rows(self) -> None:
         """map_rows で複数行を変換する."""
-        from sqly.mapper import ManualMapper
+        from sqlym.mapper import ManualMapper
 
         mapper = ManualMapper(lambda row: User(id=row["id"], name=row["name"]))
         users = mapper.map_rows(
@@ -120,21 +120,21 @@ class TestManualMapper:
 
     def test_map_rows_empty(self) -> None:
         """map_rows に空リストを渡すと空リストを返す."""
-        from sqly.mapper import ManualMapper
+        from sqlym.mapper import ManualMapper
 
         mapper = ManualMapper(lambda row: User(id=row["id"], name=row["name"]))
         assert mapper.map_rows([]) == []
 
     def test_satisfies_row_mapper_protocol(self) -> None:
         """ManualMapper は RowMapper プロトコルを満たす."""
-        from sqly.mapper import ManualMapper
+        from sqlym.mapper import ManualMapper
 
         mapper = ManualMapper(lambda row: row)
         assert isinstance(mapper, RowMapper)
 
     def test_complex_mapping_logic(self) -> None:
         """複雑な変換ロジックを持つ関数で動作する."""
-        from sqly.mapper import ManualMapper
+        from sqlym.mapper import ManualMapper
 
         def complex_mapper(row: dict[str, Any]) -> User:
             return User(

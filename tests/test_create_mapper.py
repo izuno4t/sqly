@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest
 
-from sqly.mapper import RowMapper, create_mapper
-from sqly.mapper.dataclass import DataclassMapper
-from sqly.mapper.manual import ManualMapper
+from sqlym.mapper import RowMapper, create_mapper
+from sqlym.mapper.dataclass import DataclassMapper
+from sqlym.mapper.manual import ManualMapper
 
 
 @dataclass
@@ -43,7 +43,7 @@ class TestAutoDetectPydantic:
         pytest.importorskip("pydantic")
         from pydantic import BaseModel
 
-        from sqly.mapper.pydantic import PydanticMapper
+        from sqlym.mapper.pydantic import PydanticMapper
 
         class Employee(BaseModel):
             id: int

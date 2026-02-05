@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sqly.dialect import Dialect
+    from sqlym.dialect import Dialect
 
 
 def escape_like(value: str, dialect: Dialect, *, escape_char: str | None = None) -> str:
@@ -23,7 +23,7 @@ def escape_like(value: str, dialect: Dialect, *, escape_char: str | None = None)
         エスケープ処理された文字列
 
     Examples:
-        >>> from sqly import Dialect, escape_like
+        >>> from sqlym import Dialect, escape_like
         >>> escape_like("10%off", Dialect.SQLITE)
         '10#%off'
         >>> escape_like("file_name", Dialect.ORACLE)
